@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { ReviewPage } from '@/features/review/ReviewPage';
+import { PracticePage } from '@/features/practice/PracticePage';
 import { ImportPage } from '@/features/deck/ImportPage';
 import { StatsPage } from '@/features/stats/StatsPage';
+import { CardsListPage } from '@/features/cards/CardsListPage';
 import { OnboardingDialog } from '@/features/onboarding/OnboardingDialog';
 import {
   isOnboardingCompleted,
@@ -56,6 +58,8 @@ export default function App() {
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/review" replace />} />
           <Route path="review" element={<ReviewPage />} />
+          <Route path="practice" element={<PracticePage />} />
+          <Route path="cards" element={<CardsListPage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="stats" element={<StatsPage />} />
           <Route path="*" element={<Navigate to="/review" replace />} />

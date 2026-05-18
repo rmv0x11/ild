@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { BarChart3, Brain, Upload, type LucideIcon } from 'lucide-react';
+import { BarChart3, Brain, Layers, Upload, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/AuthContext';
 import { UserBadge } from '@/features/auth/UserBadge';
@@ -8,6 +8,7 @@ import { useSync } from '@/features/sync/useSync';
 
 const navItems: { to: string; label: string; Icon: LucideIcon }[] = [
   { to: '/review', label: 'Повторение', Icon: Brain },
+  { to: '/cards', label: 'Колода', Icon: Layers },
   { to: '/import', label: 'Импорт', Icon: Upload },
   { to: '/stats', label: 'Статистика', Icon: BarChart3 },
 ];

@@ -57,9 +57,27 @@ export function ReviewPage() {
             <p className="max-w-sm text-center text-sm text-muted-foreground">
               Загрузите CSV-колоду, чтобы начать заниматься. Или попробуйте пример из 4 слов.
             </p>
-            <Link to="/import" className={buttonVariants({ variant: 'default', size: 'lg' })}>
-              <Sparkles className="mr-2 h-4 w-4" /> Загрузить колоду
-            </Link>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Link to="/import" className={buttonVariants({ variant: 'default', size: 'lg' })}>
+                <Sparkles className="mr-2 h-4 w-4" /> Загрузить колоду
+              </Link>
+              {(stats?.total ?? 0) > 0 && (
+                <>
+                  <Link
+                    to="/cards"
+                    className={buttonVariants({ variant: 'outline', size: 'lg' })}
+                  >
+                    Открыть колоду
+                  </Link>
+                  <Link
+                    to="/practice"
+                    className={buttonVariants({ variant: 'outline', size: 'lg' })}
+                  >
+                    Тренировка
+                  </Link>
+                </>
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (
