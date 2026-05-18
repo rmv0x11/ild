@@ -112,8 +112,7 @@ func (s *Service) HandleGoogleCallback(g *GoogleProvider) http.HandlerFunc {
 			http.Error(w, "session error", http.StatusInternalServerError)
 			return
 		}
-		next := safeNextPath(q.Get("next"))
-		http.Redirect(w, r, next, http.StatusFound)
+		http.Redirect(w, r, s.successRedirectURL(q.Get("next")), http.StatusFound)
 	}
 }
 
@@ -172,7 +171,7 @@ func (s *Service) HandleEmailVerify(e *EmailAuth) http.HandlerFunc {
 			http.Error(w, "session error", http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, safeNextPath(r.URL.Query().Get("next")), http.StatusFound)
+		http.Redirect(w, r, s.successRedirectURL(r.URL.Query().Get("next")), http.StatusFound)
 	}
 }
 

@@ -69,6 +69,12 @@ type Config struct {
 
 	// AllowedOrigins is the CORS allowlist (e.g. the SPA origin in dev).
 	AllowedOrigins []string
+
+	// FrontendURL is the absolute origin (+ optional basename) of the SPA we
+	// redirect users to after sign-in. e.g. "https://rmv0x11.github.io/ild".
+	// Empty value falls back to a relative redirect on the API origin (default
+	// behaviour, which only works when the SPA is on the same host).
+	FrontendURL string
 }
 
 // GoogleEnabled reports whether Google OAuth is configured.
@@ -95,6 +101,7 @@ func Load() (*Config, error) {
 		SMTPFrom:            os.Getenv("ILD_SMTP_FROM"),
 		ResendAPIKey:        os.Getenv("ILD_RESEND_API_KEY"),
 		MailerMode:          getenv("ILD_MAILER_MODE", "stdout"),
+		FrontendURL:         os.Getenv("ILD_FRONTEND_URL"),
 		MagicLinkTTLMinutes: getenvInt("ILD_MAGIC_LINK_TTL_MINUTES", 15),
 		AllowedOrigins:      splitCSV(os.Getenv("ILD_ALLOWED_ORIGINS")),
 	}

@@ -31,6 +31,11 @@ type Options struct {
 	CookieName   string
 	SecureCookie bool
 	SessionTTL   time.Duration
+	// FrontendURL is the absolute origin of the SPA (e.g.
+	// "https://rmv0x11.github.io/ild"). Used after a successful magic-link or
+	// OAuth callback so the user lands on the actual app, not on the backend's
+	// own "/" — which serves nothing.
+	FrontendURL string
 }
 
 // Service implements session issuance/reading and is the receiver for all
@@ -41,6 +46,7 @@ type Service struct {
 	cookieName   string
 	secureCookie bool
 	sessionTTL   time.Duration
+	frontendURL  string
 }
 
 // NewService builds a Service. It panics if the cookie secret is shorter than
@@ -68,7 +74,22 @@ func NewService(opts Options) *Service {
 		cookieName:   name,
 		secureCookie: opts.SecureCookie,
 		sessionTTL:   ttl,
+		frontendURL:  strings.TrimRight(opts.FrontendURL, "/"),
 	}
+}
+
+// successRedirectURL builds the URL to send the browser to after a
+// successful sign-in. If FrontendURL is configured, we prefix the safe path
+// with it (cross-host redirect to the SPA); otherwise stay relative.
+func (s *Service) successRedirectURL(nextQuery string) string {
+	path := safeNextPath(nextQuery)
+	if path == "/" {
+		path = "/review"
+	}
+	if s.frontendURL != "" {
+		return s.frontendURL + path
+	}
+	return path
 }
 
 // CookieName exposes the configured cookie name (used by handlers/tests).

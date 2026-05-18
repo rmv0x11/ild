@@ -65,6 +65,7 @@ func run() int {
 		CookieSecret: cfg.CookieSecret,
 		SecureCookie: cfg.SecureCookie,
 		SessionTTL:   time.Duration(cfg.SessionTTLHours) * time.Hour,
+		FrontendURL:  cfg.FrontendURL,
 	})
 
 	// Mailer choice: stdout for dev (printed magic-link URL is harmless),
