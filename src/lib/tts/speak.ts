@@ -141,17 +141,51 @@ export interface SpeakResult {
   spoke: boolean;
   errorType?: string;
   voice?: VoiceInfo | null;
+  /** Which engine actually produced the sound, if any. */
+  via?: 'speechSynthesis' | 'audio' | null;
 }
 
-const MAX_SPEAK_MS = 6000;
+const MAX_SPEAK_MS = 3500;
 
-export function speakChinese(text: string): Promise<SpeakResult> {
+import { playChineseAudio } from './audio';
+
+/**
+ * Speaks Chinese text using the most reliable path available. Strategy:
+ *
+ *   1. Try speechSynthesis with a Chinese voice. Fast, offline, no network.
+ *   2. If that returns spoke=false within 3.5s (silent fail — common on
+ *      macOS Chrome where Apple Siri voices are listed but don't play),
+ *      fall back to an mp3 streamed from Google Translate's tts endpoint.
+ *      That bypasses speechSynthesis entirely.
+ *
+ * Must be invoked from a user gesture; otherwise both paths are subject to
+ * the browser's autoplay policy and will silently no-op.
+ */
+export async function speakChinese(text: string): Promise<SpeakResult> {
+  const native = await trySpeechSynthesis(text);
+  if (native.spoke) return { ...native, via: 'speechSynthesis' };
+
+  // Audio fallback is web-only; in jsdom there's no HTMLAudioElement, so
+  // we just bubble up the native result rather than spending an extra
+  // network roundtrip the test runner doesn't model.
+  if (typeof Audio === 'undefined') return { ...native, via: null };
+
+  console.log('[tts] falling back to audio mp3', {
+    nativeError: native.errorType,
+  });
+  const audio = await playChineseAudio(text);
+  return {
+    spoke: audio.spoke,
+    errorType: audio.spoke ? undefined : audio.errorType ?? native.errorType,
+    voice: getChineseVoiceInfo(),
+    via: audio.spoke ? 'audio' : null,
+  };
+}
+
+function trySpeechSynthesis(text: string): Promise<SpeakResult> {
   if (!isTtsAvailable()) {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve({ spoke: false }), 800);
-    });
+    return Promise.resolve({ spoke: false, voice: null, via: null });
   }
-
   ensureVoicesListener();
 
   return new Promise((resolve) => {
@@ -173,12 +207,21 @@ export function speakChinese(text: string): Promise<SpeakResult> {
       utterance.rate = 0.9;
       const voice = getChineseVoice();
       if (voice) utterance.voice = voice;
-      utterance.onend = () => finish(true);
+      utterance.onend = () => {
+        console.log('[tts] speechSynthesis onend', { text });
+        finish(true);
+      };
       utterance.onerror = (e) => {
         const ev = e as SpeechSynthesisErrorEvent;
         errorType = ev.error ?? 'unknown';
+        console.warn('[tts] speechSynthesis onerror', errorType);
         finish(false);
       };
+      console.log('[tts] speechSynthesis speak', {
+        text,
+        voice: voice?.name,
+        local: voice?.localService,
+      });
       window.speechSynthesis.speak(utterance);
     } catch {
       finish(false);

@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type * as SpeakModule from './speak';
 
+// Audio fallback hits an external HTTP endpoint via <audio>. Tests only
+// exercise the speechSynthesis branch; mock the audio module so any
+// fallback call resolves immediately with spoke=false instead of waiting
+// on a jsdom HTMLAudioElement that never finishes.
+vi.mock('./audio', () => ({
+  playChineseAudio: vi.fn(() => Promise.resolve({ spoke: false })),
+}));
+
 interface FakeUtterance {
   text: string;
   lang: string;
