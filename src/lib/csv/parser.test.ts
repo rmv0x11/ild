@@ -3,7 +3,7 @@ import { parseDeckCsv, stringifyDeckCsv, SAMPLE_CSV } from './parser';
 import type { CsvRow } from '@/types/domain';
 
 describe('parseDeckCsv', () => {
-  it('parses the sample CSV from the task spec (2 rows)', () => {
+  it('parses the bundled SAMPLE_CSV (2 rows)', () => {
     const { rows, errors } = parseDeckCsv(SAMPLE_CSV);
     expect(errors).toEqual([]);
     expect(rows).toHaveLength(2);
