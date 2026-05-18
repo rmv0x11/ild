@@ -23,12 +23,25 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
   const [lastErrorType, setLastErrorType] = useState<string | null>(null);
   const minTimerRef = useRef<number | null>(null);
 
+  const [lastResult, setLastResult] = useState<{
+    spoke: boolean;
+    errorType?: string;
+    voice?: string;
+    local?: boolean;
+  } | null>(null);
+
   const playTts = (): void => {
     setIsSpeaking(true);
     setLastErrorType(null);
     speakChinese(word)
       .then((res) => {
         if (res.errorType) setLastErrorType(res.errorType);
+        setLastResult({
+          spoke: res.spoke,
+          errorType: res.errorType,
+          voice: res.voice?.name,
+          local: res.voice?.local,
+        });
       })
       .finally(() => {
         setIsSpeaking(false);
@@ -124,6 +137,15 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
               вкладку.
             </span>
           </div>
+        </div>
+      )}
+
+      {lastResult && (
+        <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+          <div className="font-semibold">Последний speak:</div>
+          <pre className="overflow-x-auto whitespace-pre-wrap text-[10px]">
+            {JSON.stringify(lastResult, null, 2)}
+          </pre>
         </div>
       )}
 
