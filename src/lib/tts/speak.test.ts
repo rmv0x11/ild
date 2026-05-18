@@ -194,7 +194,7 @@ describe('tts/speak', () => {
       const p = mod.speakChinese('你好');
       // The fallback uses setTimeout(..., 800). Advance past it.
       await vi.advanceTimersByTimeAsync(800);
-      await expect(p).resolves.toBeUndefined();
+      await expect(p).resolves.toMatchObject({ spoke: false });
     });
 
     it('cancels previous speech, configures and speaks an utterance, resolves on onend', async () => {
@@ -205,7 +205,7 @@ describe('tts/speak', () => {
       });
       const mod = await loadModule();
 
-      await expect(mod.speakChinese('你好')).resolves.toBeUndefined();
+      await expect(mod.speakChinese('你好')).resolves.toMatchObject({ spoke: true });
 
       expect(synth!.cancel).toHaveBeenCalledTimes(1);
       expect(synth!.speak).toHaveBeenCalledTimes(1);
@@ -220,8 +220,9 @@ describe('tts/speak', () => {
       installSpeechMocks({ voices: [], speakBehavior: 'errorMicrotask' });
       const mod = await loadModule();
       // onerror used to reject; now we always resolve so the UI can recover
-      // even when the browser drops the utterance silently.
-      await expect(mod.speakChinese('hi')).resolves.toBeUndefined();
+      // even when the browser drops the utterance silently. spoke=false +
+      // errorType lets the UI explain what went wrong.
+      await expect(mod.speakChinese('hi')).resolves.toMatchObject({ spoke: false });
     });
 
     it('resolves (does not reject) when an exception is thrown synchronously while speaking', async () => {
@@ -230,13 +231,13 @@ describe('tts/speak', () => {
         throw new Error('speak failed');
       });
       const mod = await loadModule();
-      await expect(mod.speakChinese('boom')).resolves.toBeUndefined();
+      await expect(mod.speakChinese('boom')).resolves.toMatchObject({ spoke: false });
     });
 
     it('does not set a voice when no Chinese voice is available', async () => {
       installSpeechMocks({ voices: [makeVoice('en-US')], speakBehavior: 'endMicrotask' });
       const mod = await loadModule();
-      await expect(mod.speakChinese('hello')).resolves.toBeUndefined();
+      await expect(mod.speakChinese('hello')).resolves.toMatchObject({ spoke: true });
       expect(lastUtterance!.voice).toBeNull();
       expect(lastUtterance!.lang).toBe('zh-CN');
     });

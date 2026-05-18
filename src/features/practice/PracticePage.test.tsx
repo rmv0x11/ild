@@ -9,7 +9,7 @@ import { PracticePage } from './PracticePage';
 
 vi.mock('@/lib/tts/speak', () => ({
   isTtsAvailable: () => false,
-  speakChinese: vi.fn(() => Promise.resolve()),
+  speakChinese: vi.fn(() => Promise.resolve({ spoke: true })),
   cancelSpeech: vi.fn(),
 }));
 

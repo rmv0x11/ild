@@ -4,10 +4,11 @@ import { ReviewStep2 } from './ReviewStep2';
 
 vi.mock('@/lib/tts/speak', () => ({
   isTtsAvailable: vi.fn(() => true),
-  speakChinese: vi.fn(() => Promise.resolve()),
+  speakChinese: vi.fn(() => Promise.resolve({ spoke: true })),
   cancelSpeech: vi.fn(),
   getChineseVoiceLabel: vi.fn(() => 'Mock Voice (zh-CN)'),
   getChineseVoice: vi.fn(() => null),
+  getChineseVoiceInfo: vi.fn(() => null),
 }));
 
 const isTtsAvailableMock = vi.mocked(ttsModule.isTtsAvailable);
@@ -27,7 +28,7 @@ describe('ReviewStep2', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     isTtsAvailableMock.mockReturnValue(true);
-    speakChineseMock.mockImplementation(() => Promise.resolve());
+    speakChineseMock.mockImplementation(() => Promise.resolve({ spoke: true }));
     vi.useFakeTimers();
   });
 
