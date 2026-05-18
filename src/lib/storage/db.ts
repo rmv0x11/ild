@@ -18,6 +18,14 @@ export class IldDatabase extends Dexie {
       reviews: '++id, cardId, reviewedAt',
       meta: 'key',
     });
+    // v2 — indexed deckId so we can filter the review queue by preset/deck
+    // without scanning the whole cards table. Existing cards keep deckId
+    // undefined (treated as "default / no deck" by the deck filter UI).
+    this.version(2).stores({
+      cards: 'id, stage, dueAt, [stage+dueAt], word, deckId',
+      reviews: '++id, cardId, reviewedAt',
+      meta: 'key',
+    });
   }
 }
 

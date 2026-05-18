@@ -16,6 +16,14 @@ export interface Card {
   reps: number;
   lapses: number;
 
+  /**
+   * Optional source-deck identifier set on import. Cards added by hand-uploaded
+   * CSV leave this undefined; cards added via a preset use the preset id
+   * (e.g. "hsk-1", "topic-food"). Used by the deck-filter UI to scope review
+   * sessions to a single preset.
+   */
+  deckId?: string;
+
   createdAt: number;
   updatedAt: number;
 }

@@ -34,9 +34,9 @@ export const PRESETS: Preset[] = [
   {
     id: 'hsk-3',
     name: 'HSK 3',
-    description: 'Расширенный набор слов HSK 3: понятия, эмоции, связи между предложениями.',
+    description: '200 новых слов HSK 3: понятия, эмоции, связи между предложениями.',
     category: 'hsk',
-    approxCards: 270,
+    approxCards: 200,
     file: 'hsk-3.csv',
   },
   {

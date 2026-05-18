@@ -1,6 +1,7 @@
 import type { Card, CardStage, CsvRow, DeckStats } from '@/types/domain';
 import { uuid } from '@/lib/uuid';
 import { db } from './db';
+import { DECK_ALL, matchesDeckFilter } from './deckFilter';
 
 function endOfTodayMs(now: number): number {
   const d = new Date(now);
@@ -16,9 +17,16 @@ const STAGE_PRIORITY: Record<CardStage, number> = {
   mature: 3,
 };
 
+export interface AddCardsOptions {
+  /** Tag the imported cards with this deck id (preset id). Existing cards
+   * matched by `word` are NOT re-tagged — they keep their original deckId. */
+  deckId?: string;
+}
+
 export async function addCards(
   rows: CsvRow[],
   now: number,
+  options: AddCardsOptions = {},
 ): Promise<{ added: number; skipped: number }> {
   let added = 0;
   let skipped = 0;
@@ -44,6 +52,7 @@ export async function addCards(
         dueAt: now,
         reps: 0,
         lapses: 0,
+        deckId: options.deckId,
         createdAt: now,
         updatedAt: now,
       };
@@ -59,8 +68,16 @@ export async function addCards(
   return { added, skipped };
 }
 
-export async function getDueCards(now: number, limit?: number): Promise<Card[]> {
-  const due = await db.cards.where('dueAt').belowOrEqual(now).toArray();
+export async function getDueCards(
+  now: number,
+  options: { deckFilter?: string; limit?: number } = {},
+): Promise<Card[]> {
+  const { deckFilter = DECK_ALL, limit } = options;
+  let due = await db.cards.where('dueAt').belowOrEqual(now).toArray();
+
+  if (deckFilter !== DECK_ALL) {
+    due = due.filter((c) => matchesDeckFilter(c.deckId, deckFilter));
+  }
 
   due.sort((a, b) => {
     const pa = STAGE_PRIORITY[a.stage];
@@ -75,8 +92,11 @@ export async function getDueCards(now: number, limit?: number): Promise<Card[]> 
   return due;
 }
 
-export async function getNextDueCard(now: number): Promise<Card | undefined> {
-  const [first] = await getDueCards(now, 1);
+export async function getNextDueCard(
+  now: number,
+  deckFilter: string = DECK_ALL,
+): Promise<Card | undefined> {
+  const [first] = await getDueCards(now, { deckFilter, limit: 1 });
   return first;
 }
 
@@ -84,8 +104,10 @@ export async function updateCard(card: Card): Promise<void> {
   await db.cards.put(card);
 }
 
-export async function getAllCards(): Promise<Card[]> {
-  return db.cards.toArray();
+export async function getAllCards(deckFilter: string = DECK_ALL): Promise<Card[]> {
+  const all = await db.cards.toArray();
+  if (deckFilter === DECK_ALL) return all;
+  return all.filter((c) => matchesDeckFilter(c.deckId, deckFilter));
 }
 
 export async function clearAll(): Promise<void> {
@@ -95,20 +117,58 @@ export async function clearAll(): Promise<void> {
   });
 }
 
-export async function getStats(now: number): Promise<DeckStats> {
-  const [total, newCount, learning, young, mature, relearning, dueNow, dueToday] = await Promise.all([
-    db.cards.count(),
-    db.cards.where('stage').equals('new').count(),
-    db.cards.where('stage').equals('learning').count(),
-    db.cards.where('stage').equals('young').count(),
-    db.cards.where('stage').equals('mature').count(),
-    db.cards.where('stage').equals('relearning').count(),
-    db.cards.where('dueAt').belowOrEqual(now).count(),
-    db.cards.where('dueAt').belowOrEqual(endOfTodayMs(now)).count(),
-  ]);
+export async function getStats(now: number, deckFilter: string = DECK_ALL): Promise<DeckStats> {
+  if (deckFilter === DECK_ALL) {
+    const [total, newCount, learning, young, mature, relearning, dueNow, dueToday] =
+      await Promise.all([
+        db.cards.count(),
+        db.cards.where('stage').equals('new').count(),
+        db.cards.where('stage').equals('learning').count(),
+        db.cards.where('stage').equals('young').count(),
+        db.cards.where('stage').equals('mature').count(),
+        db.cards.where('stage').equals('relearning').count(),
+        db.cards.where('dueAt').belowOrEqual(now).count(),
+        db.cards.where('dueAt').belowOrEqual(endOfTodayMs(now)).count(),
+      ]);
+
+    return { total, new: newCount, learning, young, mature, relearning, dueNow, dueToday };
+  }
+
+  // Deck-filtered path: pull only the deck's cards in one query, then bucket
+  // in-memory. The deckId index keeps this cheap even with thousands of cards.
+  const cards = await db.cards.where('deckId').equals(deckFilter).toArray();
+  const todayEnd = endOfTodayMs(now);
+  let newCount = 0;
+  let learning = 0;
+  let young = 0;
+  let mature = 0;
+  let relearning = 0;
+  let dueNow = 0;
+  let dueToday = 0;
+  for (const c of cards) {
+    switch (c.stage) {
+      case 'new':
+        newCount += 1;
+        break;
+      case 'learning':
+        learning += 1;
+        break;
+      case 'young':
+        young += 1;
+        break;
+      case 'mature':
+        mature += 1;
+        break;
+      case 'relearning':
+        relearning += 1;
+        break;
+    }
+    if (c.dueAt <= now) dueNow += 1;
+    if (c.dueAt <= todayEnd) dueToday += 1;
+  }
 
   return {
-    total,
+    total: cards.length,
     new: newCount,
     learning,
     young,
@@ -117,4 +177,16 @@ export async function getStats(now: number): Promise<DeckStats> {
     dueNow,
     dueToday,
   };
+}
+
+/** Distinct list of deckIds currently present in the cards table. Used to
+ * build the deck-selector dropdown only with decks the user actually owns. */
+export async function getKnownDeckIds(): Promise<string[]> {
+  const ids = new Set<string>();
+  await db.cards.each((c) => {
+    if (typeof c.deckId === 'string' && c.deckId.length > 0) {
+      ids.add(c.deckId);
+    }
+  });
+  return Array.from(ids).sort();
 }

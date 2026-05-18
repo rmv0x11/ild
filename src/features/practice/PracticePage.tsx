@@ -9,6 +9,9 @@ import { buttonVariants } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ReviewStep1 } from '@/features/review/ReviewStep1';
 import { ReviewStep2 } from '@/features/review/ReviewStep2';
+import { DeckSelector } from '@/features/deck/DeckSelector';
+import { useDeckFilter } from '@/features/deck/useDeckFilter';
+import { DECK_ALL } from '@/lib/storage/deckFilter';
 import { cn } from '@/lib/utils';
 import { PracticeStep3 } from './PracticeStep3';
 import { PracticeDoneScreen } from './PracticeDoneScreen';
@@ -27,7 +30,11 @@ function shuffle<T>(items: readonly T[]): T[] {
 }
 
 export function PracticePage() {
-  const allCards = useLiveQuery<DomainCard[] | undefined>(() => getAllCards(), []);
+  const [filter] = useDeckFilter();
+  const allCards = useLiveQuery<DomainCard[] | undefined>(
+    () => getAllCards(filter),
+    [filter],
+  );
 
   if (allCards === undefined) {
     return (
@@ -39,25 +46,38 @@ export function PracticePage() {
   }
 
   if (allCards.length === 0) {
+    const filtered = filter !== DECK_ALL;
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 py-16">
-          <div className="rounded-full bg-muted p-6">
-            <BookOpen className="h-12 w-12 text-muted-foreground" />
-          </div>
-          <div className="text-lg font-medium">Сначала загрузите карты</div>
-          <p className="max-w-sm text-center text-sm text-muted-foreground">
-            В колоде пока пусто. Загрузите CSV-колоду, чтобы начать тренировку.
-          </p>
-          <Link to="/import" className={buttonVariants({ variant: 'default', size: 'lg' })}>
-            <Sparkles className="mr-2 h-4 w-4" /> Загрузить колоду
-          </Link>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col gap-4">
+        <DeckSelector />
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 py-16">
+            <div className="rounded-full bg-muted p-6">
+              <BookOpen className="h-12 w-12 text-muted-foreground" />
+            </div>
+            <div className="text-lg font-medium">
+              {filtered ? 'В выбранной колоде нет карточек' : 'Сначала загрузите карты'}
+            </div>
+            <p className="max-w-sm text-center text-sm text-muted-foreground">
+              {filtered
+                ? 'Переключите фильтр на «Все колоды» или загрузите CSV/готовый набор.'
+                : 'В колоде пока пусто. Загрузите CSV-колоду, чтобы начать тренировку.'}
+            </p>
+            <Link to="/import" className={buttonVariants({ variant: 'default', size: 'lg' })}>
+              <Sparkles className="mr-2 h-4 w-4" /> Загрузить колоду
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
-  return <PracticeSession cards={allCards} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <DeckSelector />
+      <PracticeSession cards={allCards} />
+    </div>
+  );
 }
 
 function PracticeSession({ cards }: { cards: DomainCard[] }) {

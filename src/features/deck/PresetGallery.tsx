@@ -24,7 +24,7 @@ export function PresetGallery({ onAfterImport }: PresetGalleryProps) {
         );
         return;
       }
-      const res = await addCards(parsed.rows, Date.now());
+      const res = await addCards(parsed.rows, Date.now(), { deckId: preset.id });
       toast.success(
         `«${preset.name}»: добавлено ${res.added}, пропущено (дубликаты) ${res.skipped}.`,
       );

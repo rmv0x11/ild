@@ -11,6 +11,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { DeckSelector } from '@/features/deck/DeckSelector';
+import { useDeckFilter } from '@/features/deck/useDeckFilter';
+import { DECK_ALL } from '@/lib/storage/deckFilter';
+import { StreakBadge } from '@/features/stats/StreakBadge';
+import { useAchievementUnlocks } from '@/features/stats/useAchievementUnlocks';
 import { ReviewStep1 } from './ReviewStep1';
 import { ReviewStep2 } from './ReviewStep2';
 import { ReviewStep3 } from './ReviewStep3';
@@ -18,11 +23,14 @@ import { ReviewStep3 } from './ReviewStep3';
 type Step = 1 | 2 | 3;
 
 export function ReviewPage() {
+  const [filter] = useDeckFilter();
+  useAchievementUnlocks();
   const currentCard = useLiveQuery<DomainCard | undefined>(
-    () => getNextDueCard(Date.now()),
-    [],
+    () => getNextDueCard(Date.now(), filter),
+    [filter],
   );
-  const stats = useLiveQuery(() => getStats(Date.now()), []);
+  const stats = useLiveQuery(() => getStats(Date.now(), filter), [filter]);
+  const isFiltered = filter !== DECK_ALL;
 
   if (currentCard === undefined && stats === undefined) {
     return (
@@ -39,6 +47,10 @@ export function ReviewPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <DeckSelector />
+        <StreakBadge />
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary">Сейчас: {stats?.dueNow ?? 0}</Badge>
         <Badge variant="outline">Новых: {stats?.new ?? 0}</Badge>
@@ -54,9 +66,15 @@ export function ReviewPage() {
             <div className="rounded-full bg-muted p-6">
               <BookOpen className="h-12 w-12 text-muted-foreground" />
             </div>
-            <div className="text-lg font-medium">Карточек к повторению нет</div>
+            <div className="text-lg font-medium">
+              {isFiltered
+                ? 'В выбранной колоде нет карточек к повторению'
+                : 'Карточек к повторению нет'}
+            </div>
             <p className="max-w-sm text-center text-sm text-muted-foreground">
-              Загрузите CSV-колоду, чтобы начать заниматься. Или попробуйте пример из 4 слов.
+              {isFiltered
+                ? 'Переключите фильтр на «Все колоды» или подождите, пока подойдёт следующий повтор.'
+                : 'Загрузите CSV-колоду, чтобы начать заниматься. Или попробуйте пример из 4 слов.'}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Link to="/import" className={buttonVariants({ variant: 'default', size: 'lg' })}>

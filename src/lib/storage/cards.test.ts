@@ -60,7 +60,7 @@ describe('cards repository', () => {
 
   it('respects the limit argument', async () => {
     await addCards(rows, NOW);
-    const due = await getDueCards(NOW, 1);
+    const due = await getDueCards(NOW, { limit: 1 });
     expect(due).toHaveLength(1);
   });
 
@@ -151,6 +151,51 @@ describe('cards repository', () => {
     // but not the "mature" card 10 days away
     expect(stats.dueToday).toBeGreaterThanOrEqual(4);
     expect(stats.dueToday).toBeLessThanOrEqual(5);
+  });
+
+  describe('deck filtering', () => {
+    beforeEach(async () => {
+      await clearAll();
+      await addCards(
+        [{ word: 'hsk1-a', pinyin: 'a', context: '**a** A' }],
+        NOW,
+        { deckId: 'hsk-1' },
+      );
+      await addCards(
+        [{ word: 'hsk2-a', pinyin: 'b', context: '**b** B' }],
+        NOW,
+        { deckId: 'hsk-2' },
+      );
+      await addCards([{ word: 'no-deck', pinyin: 'c', context: '**c** C' }], NOW);
+    });
+
+    it('addCards tags imported rows with the deckId from options', async () => {
+      const all = await getAllCards();
+      const tagged = all.filter((c) => c.deckId === 'hsk-1');
+      expect(tagged).toHaveLength(1);
+      expect(tagged[0].word).toBe('hsk1-a');
+    });
+
+    it('getAllCards(deckId) returns only that deck', async () => {
+      const onlyHsk1 = await getAllCards('hsk-1');
+      expect(onlyHsk1.map((c) => c.word)).toEqual(['hsk1-a']);
+    });
+
+    it('getNextDueCard honors the deck filter', async () => {
+      const next = await getNextDueCard(NOW, 'hsk-2');
+      expect(next?.word).toBe('hsk2-a');
+    });
+
+    it('getStats(now, deckId) only counts cards in that deck', async () => {
+      const stats = await getStats(NOW, 'hsk-1');
+      expect(stats.total).toBe(1);
+      expect(stats.new).toBe(1);
+    });
+
+    it('getStats with DECK_ALL returns the whole collection', async () => {
+      const stats = await getStats(NOW);
+      expect(stats.total).toBe(3);
+    });
   });
 
   it('clearAll removes cards and reviews', async () => {
