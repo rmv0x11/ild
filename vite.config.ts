@@ -38,6 +38,7 @@ export default defineConfig(({ command }) => ({
       },
     },
     setupFiles: ['./src/test/setup.ts'],
+    exclude: ['node_modules', 'dist', '.claude/**'],
     css: false,
     coverage: {
       provider: 'v8',

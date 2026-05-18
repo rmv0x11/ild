@@ -10,6 +10,8 @@ import {
   markOnboardingCompleted,
 } from '@/features/onboarding/onboardingState';
 import { loadSampleDeck } from '@/features/onboarding/loadSampleDeck';
+import { LoginPage } from '@/features/auth/LoginPage';
+import { AuthCallbackPage } from '@/features/auth/AuthCallbackPage';
 
 export default function App() {
   const [onboardingOpen, setOnboardingOpen] = useState<boolean>(() => !isOnboardingCompleted());
@@ -49,6 +51,8 @@ export default function App() {
         }}
       />
       <Routes>
+        <Route path="login" element={<LoginPage />} />
+        <Route path="auth/callback" element={<AuthCallbackPage />} />
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/review" replace />} />
           <Route path="review" element={<ReviewPage />} />

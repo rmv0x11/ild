@@ -1,7 +1,32 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { vi } from 'vitest';
 import { Layout } from './Layout';
+
+vi.mock('@/features/auth/AuthContext', () => ({
+  useAuth: () => ({ status: 'guest', user: null, refresh: vi.fn(), logout: vi.fn() }),
+}));
+
+vi.mock('@/features/auth/UserBadge', () => ({
+  UserBadge: () => null,
+}));
+
+vi.mock('@/features/sync/SyncIndicator', () => ({
+  SyncIndicator: () => null,
+}));
+
+vi.mock('@/features/sync/useSync', () => ({
+  useSync: () => ({
+    state: {
+      status: 'idle',
+      lastSyncAt: null,
+      error: null,
+      pendingPush: { cards: 0, reviews: 0 },
+    },
+    syncNow: vi.fn(),
+  }),
+}));
 
 function renderLayout(initialPath = '/review') {
   return render(

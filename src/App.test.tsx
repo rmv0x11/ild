@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
@@ -10,6 +11,39 @@ vi.mock('@/lib/tts/speak', () => ({
   isTtsAvailable: () => false,
   speakChinese: vi.fn(() => Promise.resolve()),
   cancelSpeech: vi.fn(),
+}));
+
+vi.mock('@/features/auth/AuthContext', () => ({
+  useAuth: () => ({ status: 'guest', user: null, refresh: vi.fn(), logout: vi.fn() }),
+  AuthProvider: ({ children }: { children: ReactNode }) => children,
+}));
+
+vi.mock('@/features/auth/UserBadge', () => ({
+  UserBadge: () => null,
+}));
+
+vi.mock('@/features/auth/LoginPage', () => ({
+  LoginPage: () => <div>login-stub</div>,
+}));
+
+vi.mock('@/features/auth/AuthCallbackPage', () => ({
+  AuthCallbackPage: () => <div>auth-callback-stub</div>,
+}));
+
+vi.mock('@/features/sync/SyncIndicator', () => ({
+  SyncIndicator: () => null,
+}));
+
+vi.mock('@/features/sync/useSync', () => ({
+  useSync: () => ({
+    state: {
+      status: 'idle',
+      lastSyncAt: null,
+      error: null,
+      pendingPush: { cards: 0, reviews: 0 },
+    },
+    syncNow: vi.fn(),
+  }),
 }));
 
 function renderAt(path: string) {

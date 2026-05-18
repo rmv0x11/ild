@@ -14,7 +14,10 @@ const MIN_DELAY_MS = 800;
 export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
   const ttsAvailable = isTtsAvailable();
   const [ttsFinished, setTtsFinished] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  // Initial isSpeaking reflects whether TTS will auto-start on mount; this
+  // avoids a synchronous setState() inside useEffect (forbidden by
+  // react-hooks/set-state-in-effect) while still showing the spinner state.
+  const [isSpeaking, setIsSpeaking] = useState(ttsAvailable);
   const minTimerRef = useRef<number | null>(null);
 
   const playTts = (): void => {
@@ -31,7 +34,6 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
     }, MIN_DELAY_MS);
 
     if (ttsAvailable) {
-      setIsSpeaking(true);
       speakChinese(word).finally(() => {
         setIsSpeaking(false);
       });
