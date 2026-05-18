@@ -168,6 +168,74 @@ describe('tts/speak', () => {
       const mod = await loadModule();
       expect(mod.getChineseVoice()).toBeNull();
     });
+
+    it('honors a persisted voiceURI selection when the voice is available', async () => {
+      const zhCN1 = makeVoice('zh-CN', 'Tingting');
+      const zhCN2 = makeVoice('zh-CN', 'Lili');
+      installSpeechMocks({ voices: [zhCN1, zhCN2], speakBehavior: 'noop' });
+      window.localStorage.setItem('ild:tts:voiceURI', 'Lili');
+      const mod = await loadModule();
+      expect(mod.getChineseVoice()).toBe(zhCN2);
+      window.localStorage.clear();
+    });
+
+    it('falls back to default selection when the persisted voiceURI is missing', async () => {
+      const zhCN1 = makeVoice('zh-CN', 'Tingting');
+      const zhCN2 = makeVoice('zh-CN', 'Lili');
+      installSpeechMocks({ voices: [zhCN1, zhCN2], speakBehavior: 'noop' });
+      window.localStorage.setItem('ild:tts:voiceURI', 'Mei-Jia');
+      const mod = await loadModule();
+      expect(mod.getChineseVoice()).toBe(zhCN1);
+      window.localStorage.clear();
+    });
+  });
+
+  describe('getAvailableChineseVoices', () => {
+    it('returns an empty list when TTS is unavailable', async () => {
+      installSpeechMocks({ unavailable: true });
+      const mod = await loadModule();
+      expect(mod.getAvailableChineseVoices()).toEqual([]);
+    });
+
+    it('returns only Chinese voices, sorted local-first then alphabetically', async () => {
+      const en = makeVoice('en-US', 'English');
+      const zhCNRemote = { ...makeVoice('zh-CN', 'Cloud Mandarin'), localService: false };
+      const zhCNLocalB = makeVoice('zh-CN', 'Tingting');
+      const zhCNLocalA = makeVoice('zh-CN', 'Lili');
+      installSpeechMocks({
+        voices: [en, zhCNRemote as SpeechSynthesisVoice, zhCNLocalB, zhCNLocalA],
+        speakBehavior: 'noop',
+      });
+      const mod = await loadModule();
+      const list = mod.getAvailableChineseVoices();
+      expect(list.map((v) => v.name)).toEqual(['Lili', 'Tingting', 'Cloud Mandarin']);
+    });
+  });
+
+  describe('selected voice URI', () => {
+    it('round-trips through localStorage', async () => {
+      installSpeechMocks({ voices: [], speakBehavior: 'noop' });
+      const mod = await loadModule();
+      expect(mod.getSelectedVoiceURI()).toBeNull();
+      mod.setSelectedVoiceURI('Tingting');
+      expect(mod.getSelectedVoiceURI()).toBe('Tingting');
+      mod.setSelectedVoiceURI(null);
+      expect(mod.getSelectedVoiceURI()).toBeNull();
+    });
+
+    it('notifies subscribers when the selection changes', async () => {
+      installSpeechMocks({ voices: [], speakBehavior: 'noop' });
+      const mod = await loadModule();
+      const listener = vi.fn();
+      const unsubscribe = mod.subscribeToVoicesChanged(listener);
+      mod.setSelectedVoiceURI('Lili');
+      expect(listener).toHaveBeenCalled();
+      unsubscribe();
+      listener.mockClear();
+      mod.setSelectedVoiceURI('Tingting');
+      expect(listener).not.toHaveBeenCalled();
+      window.localStorage.clear();
+    });
   });
 
   describe('cancelSpeech', () => {

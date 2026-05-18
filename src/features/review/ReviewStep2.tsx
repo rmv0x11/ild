@@ -3,9 +3,13 @@ import { Volume2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   cancelSpeech,
-  getChineseVoiceInfo,
+  getAvailableChineseVoices,
+  getSelectedVoiceURI,
   isTtsAvailable,
+  setSelectedVoiceURI,
   speakChinese,
+  subscribeToVoicesChanged,
+  type VoiceInfo,
 } from '@/lib/tts/speak';
 
 interface ReviewStep2Props {
@@ -21,14 +25,21 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
   const [ttsFinished, setTtsFinished] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [lastErrorType, setLastErrorType] = useState<string | null>(null);
+  const [voices, setVoices] = useState<VoiceInfo[]>(() =>
+    ttsAvailable ? getAvailableChineseVoices() : [],
+  );
+  const [selectedURI, setSelectedURI] = useState<string | null>(() =>
+    ttsAvailable ? getSelectedVoiceURI() : null,
+  );
   const minTimerRef = useRef<number | null>(null);
 
-  const [lastResult, setLastResult] = useState<{
-    spoke: boolean;
-    errorType?: string;
-    voice?: string;
-    local?: boolean;
-  } | null>(null);
+  useEffect(() => {
+    if (!ttsAvailable) return;
+    return subscribeToVoicesChanged(() => {
+      setVoices(getAvailableChineseVoices());
+      setSelectedURI(getSelectedVoiceURI());
+    });
+  }, [ttsAvailable]);
 
   const playTts = (): void => {
     setIsSpeaking(true);
@@ -36,16 +47,14 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
     speakChinese(word)
       .then((res) => {
         if (res.errorType) setLastErrorType(res.errorType);
-        setLastResult({
-          spoke: res.spoke,
-          errorType: res.errorType,
-          voice: res.voice?.name,
-          local: res.voice?.local,
-        });
       })
       .finally(() => {
         setIsSpeaking(false);
       });
+  };
+
+  const handleVoiceChange = (uri: string): void => {
+    setSelectedVoiceURI(uri || null);
   };
 
   useEffect(() => {
@@ -70,8 +79,7 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
   }, []);
 
   const canAdvance = ttsFinished;
-  const voiceInfo = ttsAvailable ? getChineseVoiceInfo() : null;
-  const isRemoteOnly = voiceInfo !== null && !voiceInfo.local;
+  const noChineseVoice = ttsAvailable && voices.length === 0;
 
   return (
     <div className="flex flex-col items-center gap-6 py-12">
@@ -93,19 +101,32 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
         </Button>
       </div>
 
+      {ttsAvailable && voices.length > 0 && (
+        <label className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>Голос:</span>
+          <select
+            aria-label="Выбор голоса"
+            className="rounded border bg-background px-2 py-1 text-xs"
+            value={selectedURI ?? ''}
+            onChange={(e) => handleVoiceChange(e.target.value)}
+          >
+            <option value="">Автоматически</option>
+            {voices.map((v) => (
+              <option key={v.voiceURI} value={v.voiceURI}>
+                {v.name} ({v.lang}){v.local ? '' : ' — облачный'}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       {!ttsAvailable && (
         <div className="text-center text-xs text-muted-foreground">
           Озвучка недоступна в этом браузере.
         </div>
       )}
 
-      {ttsAvailable && voiceInfo && voiceInfo.local && !lastErrorType && (
-        <div className="text-center text-xs text-muted-foreground">
-          Голос: {voiceInfo.name} ({voiceInfo.lang})
-        </div>
-      )}
-
-      {ttsAvailable && voiceInfo === null && (
+      {noChineseVoice && (
         <div
           className="max-w-md rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100"
           role="status"
@@ -113,43 +134,14 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              Китайский голос (zh-*) не найден в системе. Браузер озвучит голосом по умолчанию.
-              Установите китайский язык в настройках ОС.
+              Китайский голос (zh-*) не найден в системе. Установите китайский язык в
+              настройках ОС.
             </span>
           </div>
         </div>
       )}
 
-      {ttsAvailable && isRemoteOnly && (
-        <div
-          className="max-w-md rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100"
-          role="status"
-        >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              Голос «{voiceInfo!.name}» — облачный (Apple/Google), Chrome 138+
-              блокирует такое озвучивание. Установите локальный китайский голос:
-              <br />
-              <strong>macOS:</strong> System Settings → Accessibility → Spoken Content →
-              System Voice → Manage Voices → Chinese (Simplified) → выберите голос
-              без значка облака («Tingting», «Lili», «Mei-Jia»), скачайте, перезагрузите
-              вкладку.
-            </span>
-          </div>
-        </div>
-      )}
-
-      {lastResult && (
-        <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-          <div className="font-semibold">Последний speak:</div>
-          <pre className="overflow-x-auto whitespace-pre-wrap text-[10px]">
-            {JSON.stringify(lastResult, null, 2)}
-          </pre>
-        </div>
-      )}
-
-      {ttsAvailable && lastErrorType && !isRemoteOnly && (
+      {ttsAvailable && lastErrorType && (
         <div
           className="max-w-md rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100"
           role="status"
@@ -158,8 +150,7 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               Озвучка не удалась: <code>{lastErrorType}</code>. Проверьте громкость
-              системы, что вкладка не отключена (значок 🔇), и попробуйте «Повторить
-              озвучку».
+              системы или выберите другой голос.
             </span>
           </div>
         </div>

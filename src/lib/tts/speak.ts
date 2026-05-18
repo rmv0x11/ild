@@ -8,8 +8,21 @@
 // user. Promise<void> would simplify this file further but would force a
 // ripple of edits across every consumer for no real benefit.
 
+const VOICE_LS_KEY = 'ild:tts:voiceURI';
+
 let cachedVoices: SpeechSynthesisVoice[] | null = null;
 let voicesListenerAttached = false;
+const voicesChangedListeners = new Set<() => void>();
+
+function notifyVoicesChanged(): void {
+  for (const fn of voicesChangedListeners) {
+    try {
+      fn();
+    } catch {
+      /* ignored */
+    }
+  }
+}
 
 function ensureVoicesListener(): void {
   if (voicesListenerAttached) return;
@@ -17,6 +30,7 @@ function ensureVoicesListener(): void {
   voicesListenerAttached = true;
   window.speechSynthesis.addEventListener('voiceschanged', () => {
     cachedVoices = window.speechSynthesis.getVoices();
+    notifyVoicesChanged();
   });
 }
 
@@ -35,30 +49,90 @@ export function warmUpTts(): void {
   }
 }
 
-export function getChineseVoice(): SpeechSynthesisVoice | null {
-  if (!isTtsAvailable()) return null;
-  ensureVoicesListener();
-  if (!cachedVoices || cachedVoices.length === 0) {
-    cachedVoices = window.speechSynthesis.getVoices();
-  }
-  if (!cachedVoices || cachedVoices.length === 0) return null;
-
-  const chinese = cachedVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('zh'));
-  if (chinese.length === 0) return null;
-  const zhCN = chinese.find((v) => v.lang.toLowerCase().startsWith('zh-cn'));
-  return zhCN ?? chinese[0];
-}
-
 export interface VoiceInfo {
   name: string;
   lang: string;
   local: boolean;
+  voiceURI: string;
+}
+
+function voiceToInfo(v: SpeechSynthesisVoice): VoiceInfo {
+  return {
+    name: v.name || v.lang,
+    lang: v.lang,
+    local: !!v.localService,
+    voiceURI: v.voiceURI,
+  };
+}
+
+function readChineseVoices(): SpeechSynthesisVoice[] {
+  if (!isTtsAvailable()) return [];
+  ensureVoicesListener();
+  if (!cachedVoices || cachedVoices.length === 0) {
+    cachedVoices = window.speechSynthesis.getVoices();
+  }
+  if (!cachedVoices) return [];
+  return cachedVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('zh'));
+}
+
+export function getAvailableChineseVoices(): VoiceInfo[] {
+  return readChineseVoices()
+    .slice()
+    .sort((a, b) => {
+      const la = !!a.localService;
+      const lb = !!b.localService;
+      if (la !== lb) return la ? -1 : 1;
+      return (a.name || '').localeCompare(b.name || '');
+    })
+    .map(voiceToInfo);
+}
+
+export function getSelectedVoiceURI(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem(VOICE_LS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setSelectedVoiceURI(uri: string | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (uri === null) window.localStorage.removeItem(VOICE_LS_KEY);
+    else window.localStorage.setItem(VOICE_LS_KEY, uri);
+  } catch {
+    /* ignored */
+  }
+  notifyVoicesChanged();
+}
+
+/** Subscribe to voices/selection changes. Returns an unsubscribe fn. */
+export function subscribeToVoicesChanged(listener: () => void): () => void {
+  ensureVoicesListener();
+  voicesChangedListeners.add(listener);
+  return () => {
+    voicesChangedListeners.delete(listener);
+  };
+}
+
+export function getChineseVoice(): SpeechSynthesisVoice | null {
+  const chinese = readChineseVoices();
+  if (chinese.length === 0) return null;
+
+  const selectedURI = getSelectedVoiceURI();
+  if (selectedURI) {
+    const found = chinese.find((v) => v.voiceURI === selectedURI);
+    if (found) return found;
+  }
+
+  const zhCN = chinese.find((v) => v.lang.toLowerCase().startsWith('zh-cn'));
+  return zhCN ?? chinese[0];
 }
 
 export function getChineseVoiceInfo(): VoiceInfo | null {
   const v = getChineseVoice();
-  if (!v) return null;
-  return { name: v.name || v.lang, lang: v.lang, local: !!v.localService };
+  return v ? voiceToInfo(v) : null;
 }
 
 export function getChineseVoiceLabel(): string | null {
@@ -101,8 +175,7 @@ export function speakChinese(text: string): Promise<SpeakResult> {
       if (voice) {
         utterance.voice = voice;
       }
-      utterance.onend = () =>
-        resolve({ spoke: true, voice: getChineseVoiceInfo() });
+      utterance.onend = () => resolve({ spoke: true, voice: getChineseVoiceInfo() });
       utterance.onerror = (event) => {
         const ev = event as SpeechSynthesisErrorEvent;
         resolve({

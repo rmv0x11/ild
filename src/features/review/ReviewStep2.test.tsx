@@ -9,11 +9,18 @@ vi.mock('@/lib/tts/speak', () => ({
   getChineseVoiceLabel: vi.fn(() => 'Mock Voice (zh-CN)'),
   getChineseVoice: vi.fn(() => null),
   getChineseVoiceInfo: vi.fn(() => null),
+  getAvailableChineseVoices: vi.fn(() => []),
+  getSelectedVoiceURI: vi.fn(() => null),
+  setSelectedVoiceURI: vi.fn(),
+  subscribeToVoicesChanged: vi.fn(() => () => {}),
 }));
 
 const isTtsAvailableMock = vi.mocked(ttsModule.isTtsAvailable);
 const speakChineseMock = vi.mocked(ttsModule.speakChinese);
 const cancelSpeechMock = vi.mocked(ttsModule.cancelSpeech);
+const getAvailableChineseVoicesMock = vi.mocked(ttsModule.getAvailableChineseVoices);
+const getSelectedVoiceURIMock = vi.mocked(ttsModule.getSelectedVoiceURI);
+const setSelectedVoiceURIMock = vi.mocked(ttsModule.setSelectedVoiceURI);
 
 // Flush microtasks (so .finally on the speakChinese promise resolves) wrapped in act
 // to keep React state updates from leaking into the next assertion.
@@ -106,5 +113,35 @@ describe('ReviewStep2', () => {
     expect(cancelSpeechMock).not.toHaveBeenCalled();
     unmount();
     expect(cancelSpeechMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the voice selector when Chinese voices are available', () => {
+    getAvailableChineseVoicesMock.mockReturnValue([
+      { name: 'Tingting', lang: 'zh-CN', local: true, voiceURI: 'Tingting' },
+      { name: 'Lili', lang: 'zh-CN', local: true, voiceURI: 'Lili' },
+    ]);
+    render(<ReviewStep2 word="你好" pinyin="nǐ hǎo" onNext={vi.fn()} />);
+    const select = screen.getByRole('combobox', { name: 'Выбор голоса' });
+    expect(select).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Tingting/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Lili/ })).toBeInTheDocument();
+  });
+
+  it('does NOT render the voice selector when no Chinese voices are available', () => {
+    getAvailableChineseVoicesMock.mockReturnValue([]);
+    render(<ReviewStep2 word="你好" pinyin="nǐ hǎo" onNext={vi.fn()} />);
+    expect(screen.queryByRole('combobox', { name: 'Выбор голоса' })).not.toBeInTheDocument();
+  });
+
+  it('changing the voice selector persists the choice via setSelectedVoiceURI', () => {
+    getAvailableChineseVoicesMock.mockReturnValue([
+      { name: 'Tingting', lang: 'zh-CN', local: true, voiceURI: 'Tingting' },
+      { name: 'Lili', lang: 'zh-CN', local: true, voiceURI: 'Lili' },
+    ]);
+    getSelectedVoiceURIMock.mockReturnValue(null);
+    render(<ReviewStep2 word="你好" pinyin="nǐ hǎo" onNext={vi.fn()} />);
+    const select = screen.getByRole('combobox', { name: 'Выбор голоса' }) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'Lili' } });
+    expect(setSelectedVoiceURIMock).toHaveBeenLastCalledWith('Lili');
   });
 });

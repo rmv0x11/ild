@@ -11,6 +11,13 @@ vi.mock('@/lib/tts/speak', () => ({
   isTtsAvailable: () => false,
   speakChinese: vi.fn(() => Promise.resolve({ spoke: true })),
   cancelSpeech: vi.fn(),
+  getChineseVoiceLabel: () => null,
+  getChineseVoice: () => null,
+  getChineseVoiceInfo: () => null,
+  getAvailableChineseVoices: () => [],
+  getSelectedVoiceURI: () => null,
+  setSelectedVoiceURI: vi.fn(),
+  subscribeToVoicesChanged: () => () => {},
 }));
 
 function renderWithRouter() {

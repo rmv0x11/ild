@@ -14,6 +14,10 @@ vi.mock('@/lib/tts/speak', () => ({
   getChineseVoiceLabel: () => null,
   getChineseVoice: () => null,
   getChineseVoiceInfo: () => null,
+  getAvailableChineseVoices: () => [],
+  getSelectedVoiceURI: () => null,
+  setSelectedVoiceURI: vi.fn(),
+  subscribeToVoicesChanged: () => () => {},
 }));
 
 vi.mock('@/features/auth/AuthContext', () => ({
