@@ -28,6 +28,15 @@ export function getChineseVoice(): SpeechSynthesisVoice | null {
   return zhCN ?? chinese[0];
 }
 
+// Convenience for UI: "Tingting (zh-CN)" or null when no Chinese voice is
+// available — we use this to show a tiny diagnostic line on the review card
+// so the user understands why audio is silent.
+export function getChineseVoiceLabel(): string | null {
+  const v = getChineseVoice();
+  if (!v) return null;
+  return v.name ? `${v.name} (${v.lang})` : v.lang;
+}
+
 export function cancelSpeech(): void {
   if (!isTtsAvailable()) return;
   window.speechSynthesis.cancel();

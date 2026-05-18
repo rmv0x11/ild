@@ -6,6 +6,8 @@ vi.mock('@/lib/tts/speak', () => ({
   isTtsAvailable: vi.fn(() => true),
   speakChinese: vi.fn(() => Promise.resolve()),
   cancelSpeech: vi.fn(),
+  getChineseVoiceLabel: vi.fn(() => 'Mock Voice (zh-CN)'),
+  getChineseVoice: vi.fn(() => null),
 }));
 
 const isTtsAvailableMock = vi.mocked(ttsModule.isTtsAvailable);

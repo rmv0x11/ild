@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Volume2 } from 'lucide-react';
+import { Volume2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cancelSpeech, isTtsAvailable, speakChinese } from '@/lib/tts/speak';
+import {
+  cancelSpeech,
+  getChineseVoiceLabel,
+  isTtsAvailable,
+  speakChinese,
+} from '@/lib/tts/speak';
 
 interface ReviewStep2Props {
   word: string;
@@ -55,6 +60,8 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
   // and never fire onend, which would otherwise lock the UI forever.
   const canAdvance = ttsFinished;
 
+  const voiceLabel = ttsAvailable ? getChineseVoiceLabel() : null;
+
   return (
     <div className="flex flex-col items-center gap-8 py-12">
       <div className="text-center text-7xl font-semibold tracking-tight">{word}</div>
@@ -74,6 +81,28 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
           Показать перевод
         </Button>
       </div>
+      {ttsAvailable ? (
+        voiceLabel ? (
+          <div className="text-center text-xs text-muted-foreground">
+            Голос: {voiceLabel}
+          </div>
+        ) : (
+          <div
+            className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100"
+            role="status"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>
+              Китайский голос (zh-*) не найден в системе. Браузер озвучит иероглифы голосом по умолчанию.
+              Установите китайский язык в настройках ОС, чтобы услышать корректное произношение.
+            </span>
+          </div>
+        )
+      ) : (
+        <div className="text-center text-xs text-muted-foreground">
+          Озвучка недоступна в этом браузере.
+        </div>
+      )}
     </div>
   );
 }
