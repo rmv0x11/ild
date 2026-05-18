@@ -1,4 +1,5 @@
 import type { Card, CardStage, CsvRow, DeckStats } from '@/types/domain';
+import { uuid } from '@/lib/uuid';
 import { db } from './db';
 
 function endOfTodayMs(now: number): number {
@@ -32,7 +33,7 @@ export async function addCards(
         continue;
       }
       const card: Card = {
-        id: crypto.randomUUID(),
+        id: uuid(),
         word: row.word,
         pinyin: row.pinyin,
         context: row.context,

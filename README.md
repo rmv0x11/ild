@@ -2,8 +2,6 @@
 
 Anki-подобный веб-сервис для изучения китайского. Трёхшаговая карточка (иероглиф → пиньинь+TTS → перевод+контекст), SM-2 интервальное повторение, локальное хранилище в IndexedDB.
 
-ТЗ — в [`task`](./task).
-
 ## Stack
 
 React 19 · TypeScript · Vite · Tailwind v4 · Dexie · react-router · Vitest

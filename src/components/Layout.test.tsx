@@ -1,0 +1,73 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Layout } from './Layout';
+
+function renderLayout(initialPath = '/review') {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="review" element={<div>review-stub</div>} />
+          <Route path="import" element={<div>import-stub</div>} />
+          <Route path="stats" element={<div>stats-stub</div>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+describe('Layout', () => {
+  it('renders header with title "ild"', () => {
+    renderLayout();
+    const title = screen.getByRole('link', { name: 'ild' });
+    expect(title).toBeInTheDocument();
+    expect(title).toHaveAttribute('href', '/review');
+  });
+
+  it('navigation has links to Повторение, Импорт, and Статистика', () => {
+    renderLayout();
+    expect(screen.getByRole('link', { name: 'Повторение' })).toHaveAttribute(
+      'href',
+      '/review',
+    );
+    expect(screen.getByRole('link', { name: 'Импорт' })).toHaveAttribute(
+      'href',
+      '/import',
+    );
+    expect(screen.getByRole('link', { name: 'Статистика' })).toHaveAttribute(
+      'href',
+      '/stats',
+    );
+  });
+
+  it('renders the active route content via Outlet', () => {
+    renderLayout('/review');
+    expect(screen.getByText('review-stub')).toBeInTheDocument();
+  });
+
+  it('marks the active NavLink with bold/underline classes', () => {
+    renderLayout('/review');
+    const active = screen.getByRole('link', { name: 'Повторение' });
+    expect(active.className).toMatch(/font-bold/);
+    expect(active.className).toMatch(/underline/);
+
+    const inactive = screen.getByRole('link', { name: 'Импорт' });
+    expect(inactive.className).not.toMatch(/font-bold/);
+  });
+
+  it('clicking "Импорт" switches Outlet to import-stub', async () => {
+    const user = userEvent.setup();
+    renderLayout('/review');
+
+    expect(screen.getByText('review-stub')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Импорт' }));
+
+    expect(screen.getByText('import-stub')).toBeInTheDocument();
+    expect(screen.queryByText('review-stub')).not.toBeInTheDocument();
+
+    const activeNow = screen.getByRole('link', { name: 'Импорт' });
+    expect(activeNow.className).toMatch(/font-bold/);
+  });
+});
