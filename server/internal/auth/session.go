@@ -74,6 +74,18 @@ func NewService(opts Options) *Service {
 // CookieName exposes the configured cookie name (used by handlers/tests).
 func (s *Service) CookieName() string { return s.cookieName }
 
+// sameSite picks the right SameSite policy. We're a cross-site SPA
+// (frontend on rmv0x11.github.io, backend on a separate hostname), so on
+// HTTPS we must use SameSite=None+Secure or the browser drops the cookie
+// on every API request. On plain HTTP (local dev) we fall back to Lax —
+// SameSite=None requires Secure and is rejected otherwise.
+func (s *Service) sameSite() http.SameSite {
+	if s.secureCookie {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
+}
+
 // SessionTTL exposes the configured session TTL.
 func (s *Service) SessionTTL() time.Duration { return s.sessionTTL }
 
@@ -127,7 +139,7 @@ func (s *Service) IssueCookieCtx(ctx context.Context, w http.ResponseWriter, use
 		MaxAge:   int(s.sessionTTL.Seconds()),
 		HttpOnly: true,
 		Secure:   s.secureCookie,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: s.sameSite(),
 	})
 	return nil
 }
@@ -178,7 +190,7 @@ func (s *Service) Logout(w http.ResponseWriter, r *http.Request) error {
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   s.secureCookie,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: s.sameSite(),
 	})
 	return nil
 }
@@ -199,7 +211,7 @@ func (s *Service) GenerateState(w http.ResponseWriter) (string, error) {
 		MaxAge:   int(oauthStateTTL.Seconds()),
 		HttpOnly: true,
 		Secure:   s.secureCookie,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: s.sameSite(),
 	})
 	return state, nil
 }
@@ -233,6 +245,6 @@ func (s *Service) ClearStateCookie(w http.ResponseWriter) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   s.secureCookie,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: s.sameSite(),
 	})
 }
