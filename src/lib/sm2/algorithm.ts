@@ -1,4 +1,5 @@
 import type { Card, CardStage, Rating } from '@/types/domain';
+import { uuid } from '@/lib/uuid';
 import { DAY_MS, MINUTE_MS, SM2_DEFAULTS } from './constants';
 
 export function createNewCard(
@@ -6,7 +7,7 @@ export function createNewCard(
   now: number,
 ): Card {
   return {
-    id: crypto.randomUUID(),
+    id: uuid(),
     word: input.word,
     pinyin: input.pinyin,
     context: input.context,

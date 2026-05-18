@@ -32,6 +32,9 @@ pnpm-debug.log*
 # task spec (local-only)
 task
 
+# claude worktrees (transient)
+.claude/worktrees/
+
 # env
 .env
 .env.*
