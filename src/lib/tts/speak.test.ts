@@ -197,7 +197,7 @@ describe('tts/speak', () => {
       await expect(p).resolves.toMatchObject({ spoke: false });
     });
 
-    it('cancels previous speech, configures and speaks an utterance, resolves on onend', async () => {
+    it('configures and speaks an utterance, resolves on onend', async () => {
       const zhCN = makeVoice('zh-CN', 'Mandarin');
       const synth = installSpeechMocks({
         voices: [zhCN],
@@ -207,7 +207,9 @@ describe('tts/speak', () => {
 
       await expect(mod.speakChinese('你好')).resolves.toMatchObject({ spoke: true });
 
-      expect(synth!.cancel).toHaveBeenCalledTimes(1);
+      // cancel() is no longer unconditional — idle engines skip cancel to
+      // avoid Chrome's "stuck cancelling" quirk. Idle mock => zero cancels.
+      expect(synth!.cancel).not.toHaveBeenCalled();
       expect(synth!.speak).toHaveBeenCalledTimes(1);
       expect(lastUtterance).not.toBeNull();
       expect(lastUtterance!.text).toBe('你好');

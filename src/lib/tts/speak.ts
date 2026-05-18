@@ -1,5 +1,6 @@
 let cachedVoices: SpeechSynthesisVoice[] | null = null;
 let voicesListenerAttached = false;
+let voicesReadyResolvers: Array<() => void> = [];
 
 function ensureVoicesListener(): void {
   if (voicesListenerAttached) return;
@@ -7,11 +8,65 @@ function ensureVoicesListener(): void {
   voicesListenerAttached = true;
   window.speechSynthesis.addEventListener('voiceschanged', () => {
     cachedVoices = window.speechSynthesis.getVoices();
+    // Wake up anyone waiting on waitForVoices().
+    const queue = voicesReadyResolvers;
+    voicesReadyResolvers = [];
+    for (const r of queue) r();
   });
+  // Try a sync read first — voices are often already cached at this point.
+  const initial = window.speechSynthesis.getVoices();
+  if (initial.length > 0) cachedVoices = initial;
 }
 
 export function isTtsAvailable(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
+}
+
+/**
+ * Warm up the TTS engine on app load. Browsers on macOS occasionally drop the
+ * very first speak() because the audio pipeline isn't initialised yet. By
+ * speaking an empty utterance and immediately cancelling, we force the engine
+ * to start without producing any audible output. Best-effort: silent on
+ * failure, safe to call multiple times.
+ */
+export function warmUpTts(): void {
+  if (!isTtsAvailable()) return;
+  try {
+    ensureVoicesListener();
+    // Touch getVoices() — many browsers populate the cache only after this.
+    window.speechSynthesis.getVoices();
+    const u = new SpeechSynthesisUtterance('');
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+    window.speechSynthesis.cancel();
+  } catch {
+    // ignored
+  }
+}
+
+/**
+ * Wait for `voiceschanged` if voices aren't ready yet. Resolves immediately
+ * when cached voices are populated, or after `timeoutMs` regardless. Avoids
+ * the "no voice picked because getVoices() returned [] on first call" race.
+ */
+function waitForVoices(timeoutMs = 500): Promise<void> {
+  ensureVoicesListener();
+  if (cachedVoices && cachedVoices.length > 0) return Promise.resolve();
+  const sync = window.speechSynthesis.getVoices();
+  if (sync.length > 0) {
+    cachedVoices = sync;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (): void => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    voicesReadyResolvers.push(finish);
+    setTimeout(finish, timeoutMs);
+  });
 }
 
 // Best Chinese voice selection priority:
@@ -19,9 +74,6 @@ export function isTtsAvailable(): boolean {
 //   2. zh-*   + localService=true
 //   3. zh-CN  + localService=false   ← may be silently blocked by Chrome
 //   4. zh-*   + localService=false
-// Chrome 138+ refuses to play remote (Siri / Google online) voices via
-// speechSynthesis to prevent network fingerprinting — so we strongly prefer
-// local ones.
 export function getChineseVoice(): SpeechSynthesisVoice | null {
   if (!isTtsAvailable()) return null;
   ensureVoicesListener();
@@ -39,14 +91,9 @@ export function getChineseVoice(): SpeechSynthesisVoice | null {
   if (local.length > 0) {
     return local.find(isZhCN) ?? local[0];
   }
-  // No local Chinese voice. Return the remote one — caller can decide whether
-  // to actually speak or to surface a "install local voice" UI hint.
   return chinese.find(isZhCN) ?? chinese[0];
 }
 
-// Detailed voice info for the UI — lets ReviewStep2 explain *why* nothing is
-// playing (e.g. only a remote voice is available on macOS) instead of just a
-// silent button.
 export interface VoiceInfo {
   name: string;
   lang: string;
@@ -59,8 +106,6 @@ export function getChineseVoiceInfo(): VoiceInfo | null {
   return { name: v.name || v.lang, lang: v.lang, local: !!v.localService };
 }
 
-// Backwards-compatible label for tests / older callers. Adds "(локальный)"
-// or "(онлайн)" to clarify why audio might be silent.
 export function getChineseVoiceLabel(): string | null {
   const info = getChineseVoiceInfo();
   if (!info) return null;
@@ -70,17 +115,18 @@ export function getChineseVoiceLabel(): string | null {
 
 export function cancelSpeech(): void {
   if (!isTtsAvailable()) return;
-  window.speechSynthesis.cancel();
+  try {
+    window.speechSynthesis.cancel();
+  } catch {
+    /* ignored */
+  }
 }
 
-const MAX_SPEAK_MS = 5000;
+const MAX_SPEAK_MS = 8000;
+const CANCEL_TO_SPEAK_GAP_MS = 50;
 
 export interface SpeakResult {
-  /** True when a SpeechSynthesisUtterance was dispatched. False when TTS is
-   *  unavailable (or the call was swallowed by the safety timeout). */
   spoke: boolean;
-  /** onerror event detail, when present. Useful for the UI to surface
-   *  "no local voice / autoplay blocked" to the user. */
   errorType?: string;
   voice?: VoiceInfo | null;
 }
@@ -95,55 +141,74 @@ export function speakChinese(text: string): Promise<SpeakResult> {
   return new Promise((resolve) => {
     let done = false;
     let errorType: string | undefined;
+    let timer = 0;
     const finish = (spoke: boolean): void => {
       if (done) return;
       done = true;
-      window.clearTimeout(timer);
+      if (timer) window.clearTimeout(timer);
       resolve({ spoke, errorType, voice: getChineseVoiceInfo() });
     };
-    // Hard safety net: Chrome sometimes never fires `onend` (e.g. when voices
-    // aren't loaded yet, autoplay policy is restrictive, or speak silently
-    // drops the utterance). Without this timeout `isSpeaking` would stay true
-    // forever and lock the UI.
-    const timer = window.setTimeout(() => finish(false), MAX_SPEAK_MS);
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.rate = 0.9;
-      const voice = getChineseVoice();
-      if (voice) {
-        utterance.voice = voice;
-      }
-      utterance.onend = () => {
-        if (import.meta.env.DEV) {
-          // eslint-disable-next-line no-console
-          console.debug('[tts] onend', { voice: voice?.name, text });
+    // Safety net — Chrome silently drops onend in some states.
+    timer = window.setTimeout(() => finish(false), MAX_SPEAK_MS);
+
+    void (async () => {
+      try {
+        await waitForVoices(500);
+
+        const synth = window.speechSynthesis;
+
+        // Chrome on macOS sometimes lands in a "paused" state after a long
+        // idle; resume() is a no-op otherwise.
+        if (synth.paused) {
+          try { synth.resume(); } catch { /* ignored */ }
         }
-        finish(true);
-      };
-      utterance.onerror = (e) => {
-        const ev = e as SpeechSynthesisErrorEvent;
-        errorType = ev.error ?? 'unknown';
-        // Always log error — silent failures are the worst kind here.
-        // eslint-disable-next-line no-console
-        console.warn('[tts] onerror', {
-          error: errorType,
+
+        // Only cancel when something is actually queued. cancel() on idle
+        // engines can leave them in an invisibly-broken state until the
+        // next speak() — known Chrome quirk.
+        const needCancel = synth.speaking || synth.pending;
+        if (needCancel) {
+          try { synth.cancel(); } catch { /* ignored */ }
+          await new Promise((r) => setTimeout(r, CANCEL_TO_SPEAK_GAP_MS));
+        }
+
+        const voice = getChineseVoice();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+        if (voice) utterance.voice = voice;
+        utterance.onend = () => {
+          console.log('[tts] onend', { voice: voice?.name, text });
+          finish(true);
+        };
+        utterance.onerror = (e) => {
+          const ev = e as SpeechSynthesisErrorEvent;
+          errorType = ev.error ?? 'unknown';
+          console.warn('[tts] onerror', {
+            error: errorType,
+            voice: voice?.name,
+            localService: voice?.localService,
+            lang: voice?.lang,
+          });
+          finish(false);
+        };
+        console.log('[tts] speak', {
           voice: voice?.name,
           localService: voice?.localService,
           lang: voice?.lang,
+          text,
+          paused: synth.paused,
+          speaking: synth.speaking,
+          pending: synth.pending,
+          voicesCount: cachedVoices?.length ?? 0,
         });
+        synth.speak(utterance);
+      } catch (err) {
+        console.warn('[tts] threw', err);
         finish(false);
-      };
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.debug('[tts] speak', { voice: voice?.name, localService: voice?.localService, text });
       }
-      window.speechSynthesis.speak(utterance);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn('[tts] threw', err);
-      finish(false);
-    }
+    })();
   });
 }
