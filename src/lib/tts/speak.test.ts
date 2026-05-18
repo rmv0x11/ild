@@ -215,11 +215,10 @@ describe('tts/speak', () => {
       expect(lastUtterance!.text).toBe('你好');
       expect(lastUtterance!.lang).toBe('zh-CN');
       expect(lastUtterance!.rate).toBe(0.9);
-      // We intentionally do NOT pin utterance.voice; the browser resolves
-      // the best engine from lang="zh-CN" on its own. This is the regression
-      // fix: explicit Apple Siri voices were being silently dropped by
-      // Chrome 138+ when assigned via utterance.voice.
-      expect(lastUtterance!.voice).toBeNull();
+      // We DO pin the voice if it's local (Chrome on macOS goes silent
+      // otherwise — no onend, no onerror, just nothing). Remote voices we
+      // leave unset so the browser's own fallback gets picked.
+      expect(lastUtterance!.voice).toBe(zhCN);
     });
 
     it('resolves (does not reject) when utterance.onerror is fired', async () => {

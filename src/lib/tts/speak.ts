@@ -116,7 +116,6 @@ export function speakChinese(text: string): Promise<SpeakResult> {
 
     try {
       const synth = window.speechSynthesis;
-      // Always cancel — required to wake up the engine on macOS Chrome.
       try { synth.cancel(); } catch { /* ignored */ }
 
       const utterance = new SpeechSynthesisUtterance(text);
@@ -124,28 +123,72 @@ export function speakChinese(text: string): Promise<SpeakResult> {
       utterance.rate = 0.9;
       utterance.pitch = 1;
       utterance.volume = 1;
-      // NB: utterance.voice is intentionally left null — let the browser
-      // resolve the best engine for lang="zh-CN" on its own.
 
+      // Pin LOCAL voices explicitly. Field reports (debug screen showed
+      // local: true for macOS Eddy) confirm: when we don't assign voice,
+      // Chrome on macOS just sits silent — never fires onend or onerror.
+      // Assigning the local voice wakes it up. Remote voices (Siri cloud)
+      // we still leave unset so the browser's fallback gets a chance.
+      const voice = getChineseVoice();
+      if (voice && voice.localService) {
+        utterance.voice = voice;
+      }
+
+      // Chrome keep-alive: long-running utterances sometimes "drop" mid-way
+      // and never fire onend. Pulse pause/resume every 4 s while speaking
+      // to keep the engine ticking. Cleared on finish.
+      let keepAlive: number | null = null;
+      const startKeepAlive = (): void => {
+        keepAlive = window.setInterval(() => {
+          if (synth.speaking) {
+            try { synth.pause(); synth.resume(); } catch { /* ignored */ }
+          } else if (keepAlive) {
+            window.clearInterval(keepAlive);
+            keepAlive = null;
+          }
+        }, 4000);
+      };
+      const stopKeepAlive = (): void => {
+        if (keepAlive) {
+          window.clearInterval(keepAlive);
+          keepAlive = null;
+        }
+      };
+
+      utterance.onstart = () => {
+        console.log('[tts] onstart', { text });
+        startKeepAlive();
+      };
       utterance.onend = () => {
         console.log('[tts] onend', { text });
+        stopKeepAlive();
         finish(true);
       };
       utterance.onerror = (e) => {
         const ev = e as SpeechSynthesisErrorEvent;
         errorType = ev.error ?? 'unknown';
         console.warn('[tts] onerror', { error: errorType });
+        stopKeepAlive();
         finish(false);
       };
 
       console.log('[tts] speak', {
         text,
+        voice: voice?.name,
+        localService: voice?.localService,
         voicesCount: cachedVoices?.length ?? 0,
         paused: synth.paused,
         speaking: synth.speaking,
         pending: synth.pending,
       });
       synth.speak(utterance);
+
+      // Belt and braces: some Chrome builds defer the first speak() into
+      // a paused queue. Tickle resume() in the next microtask in case we
+      // landed in that state.
+      queueMicrotask(() => {
+        try { if (synth.paused) synth.resume(); } catch { /* ignored */ }
+      });
     } catch (err) {
       console.warn('[tts] threw', err);
       finish(false);
