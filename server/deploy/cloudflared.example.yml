@@ -1,0 +1,15 @@
+# /etc/cloudflared/config.yml
+# Cloudflare Tunnel configuration for ild-server.
+# Replace <TUNNEL_UUID> and <YOUR_HOSTNAME> with real values produced by
+# `cloudflared tunnel create ild` and the DNS record you assign via the
+# Cloudflare dashboard (or `cloudflared tunnel route dns ild <hostname>`).
+
+tunnel: <TUNNEL_UUID>
+credentials-file: /etc/cloudflared/<TUNNEL_UUID>.json
+
+ingress:
+  # Public hostname → forward to local ild-server on the loopback only.
+  - hostname: <YOUR_HOSTNAME>     # e.g. ild-api.example.com — TLS terminated by Cloudflare
+    service: http://127.0.0.1:8787
+  # Catch-all (required by cloudflared): everything else returns 404.
+  - service: http_status:404

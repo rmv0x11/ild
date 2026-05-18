@@ -1,0 +1,41 @@
+[Unit]
+Description=ild-server (Anki-like Chinese learning sync API)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rmv
+Group=rmv
+WorkingDirectory=/home/rmv/ild-server
+ExecStart=/home/rmv/ild-server/bin/ild-server
+EnvironmentFile=/home/rmv/ild-server/.env
+Restart=on-failure
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits — coexist gently with VPN services on the same box
+MemoryMax=128M
+MemoryHigh=96M
+CPUQuota=15%
+TasksMax=64
+Nice=10
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/rmv/ild-server/data
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
