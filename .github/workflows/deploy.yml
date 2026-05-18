@@ -32,7 +32,15 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
+      - name: Build for GitHub Pages
+        env:
+          # Backend public URL (TryCloudflare while we don't have a domain).
+          # Falls back to repo variable VITE_API_URL if set in
+          # Settings → Secrets and variables → Actions → Variables;
+          # otherwise the literal default below is used.
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://translated-knife-literature-asp.trycloudflare.com' }}
+          VITE_GOOGLE_ENABLED: ${{ vars.VITE_GOOGLE_ENABLED || 'false' }}
+        run: npm run build
 
       - uses: actions/upload-pages-artifact@v5
         with:
