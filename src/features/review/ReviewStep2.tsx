@@ -14,18 +14,14 @@ const MIN_DELAY_MS = 800;
 export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
   const ttsAvailable = isTtsAvailable();
   const [ttsFinished, setTtsFinished] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(ttsAvailable);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const minTimerRef = useRef<number | null>(null);
 
   const playTts = (): void => {
     setIsSpeaking(true);
-    speakChinese(word)
-      .catch(() => {
-        // ignore TTS errors; we still allow advancing after min delay
-      })
-      .finally(() => {
-        setIsSpeaking(false);
-      });
+    speakChinese(word).finally(() => {
+      setIsSpeaking(false);
+    });
   };
 
   useEffect(() => {
@@ -35,13 +31,10 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
     }, MIN_DELAY_MS);
 
     if (ttsAvailable) {
-      speakChinese(word)
-        .catch(() => {
-          // see playTts: ignore TTS errors
-        })
-        .finally(() => {
-          setIsSpeaking(false);
-        });
+      setIsSpeaking(true);
+      speakChinese(word).finally(() => {
+        setIsSpeaking(false);
+      });
     }
 
     return () => {
@@ -55,7 +48,10 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const canAdvance = ttsFinished && !isSpeaking;
+  // Translation gate: only the 800 ms minimum-attention timer. We intentionally
+  // do NOT depend on `isSpeaking` — some Chromes silently drop the utterance
+  // and never fire onend, which would otherwise lock the UI forever.
+  const canAdvance = ttsFinished;
 
   return (
     <div className="flex flex-col items-center gap-8 py-12">
@@ -66,11 +62,11 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
           variant="outline"
           size="lg"
           onClick={playTts}
-          disabled={isSpeaking}
-          aria-label="Повторить озвучку"
+          aria-label={isSpeaking ? 'Идёт озвучка…' : 'Повторить озвучку'}
+          aria-busy={isSpeaking}
         >
           <Volume2 />
-          Повторить озвучку
+          {isSpeaking ? 'Озвучка…' : 'Повторить озвучку'}
         </Button>
         <Button size="lg" onClick={onNext} disabled={!canAdvance} data-step3-trigger>
           Показать перевод

@@ -216,20 +216,21 @@ describe('tts/speak', () => {
       expect(lastUtterance!.voice).toBe(zhCN);
     });
 
-    it('rejects when utterance.onerror is fired', async () => {
+    it('resolves (does not reject) when utterance.onerror is fired', async () => {
       installSpeechMocks({ voices: [], speakBehavior: 'errorMicrotask' });
       const mod = await loadModule();
-      await expect(mod.speakChinese('hi')).rejects.toBeDefined();
+      // onerror used to reject; now we always resolve so the UI can recover
+      // even when the browser drops the utterance silently.
+      await expect(mod.speakChinese('hi')).resolves.toBeUndefined();
     });
 
-    it('rejects when an exception is thrown synchronously while speaking', async () => {
+    it('resolves (does not reject) when an exception is thrown synchronously while speaking', async () => {
       const synth = installSpeechMocks({ voices: [], speakBehavior: 'noop' });
-      // Force speak() to throw
       synth!.speak.mockImplementation(() => {
         throw new Error('speak failed');
       });
       const mod = await loadModule();
-      await expect(mod.speakChinese('boom')).rejects.toThrow('speak failed');
+      await expect(mod.speakChinese('boom')).resolves.toBeUndefined();
     });
 
     it('does not set a voice when no Chinese voice is available', async () => {

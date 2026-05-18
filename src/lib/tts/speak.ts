@@ -33,6 +33,8 @@ export function cancelSpeech(): void {
   window.speechSynthesis.cancel();
 }
 
+const MAX_SPEAK_MS = 5000;
+
 export function speakChinese(text: string): Promise<void> {
   if (!isTtsAvailable()) {
     return new Promise((resolve) => {
@@ -40,7 +42,19 @@ export function speakChinese(text: string): Promise<void> {
     });
   }
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (): void => {
+      if (done) return;
+      done = true;
+      window.clearTimeout(timer);
+      resolve();
+    };
+    // Hard safety net: Chrome sometimes never fires `onend` (e.g. when voices
+    // aren't loaded yet, autoplay policy is restrictive, or speak silently
+    // drops the utterance). Without this timeout `isSpeaking` would stay true
+    // forever and lock the UI.
+    const timer = window.setTimeout(finish, MAX_SPEAK_MS);
     try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
@@ -50,11 +64,11 @@ export function speakChinese(text: string): Promise<void> {
       if (voice) {
         utterance.voice = voice;
       }
-      utterance.onend = () => resolve();
-      utterance.onerror = (event) => reject(event);
+      utterance.onend = finish;
+      utterance.onerror = finish;
       window.speechSynthesis.speak(utterance);
-    } catch (err) {
-      reject(err);
+    } catch {
+      finish();
     }
   });
 }
