@@ -139,7 +139,7 @@ func (m *mockAuth) HandleLogout(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (m *mockAuth) HandleMe(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, UserFromContext(r.Context()))
+	writeJSON(w, http.StatusOK, map[string]any{"user": UserFromContext(r.Context())})
 }
 
 // mockEmail is a trivial stub of EmailHandlers — the router test does not
@@ -505,32 +505,44 @@ func TestGoogleRoutesEnabled(t *testing.T) {
 	}
 }
 
-func TestMeRequiresUser(t *testing.T) {
+func TestMeReturnsUserOrNull(t *testing.T) {
 	user := &domain.User{ID: "u1", Email: "a@b.c", Name: "Alice"}
 	deps := defaultDeps()
 	deps.Auth = newMockAuth(user)
 	srv, closer := newTestServer(t, deps)
 	defer closer()
 
-	// Anonymous → 401.
+	// Anonymous → 200 + {"user":null} (frontend treats this as guest without
+	// generating a noisy 401 in the browser console).
 	req := authedRequest(t, http.MethodGet, srv.URL+"/api/v1/me", "", nil)
-	status, _ := do(t, srv.Client(), req)
-	if status != http.StatusUnauthorized {
-		t.Fatalf("anonymous /me status=%d want 401", status)
+	status, body := do(t, srv.Client(), req)
+	if status != http.StatusOK {
+		t.Fatalf("anonymous /me status=%d want 200", status)
+	}
+	var anon struct {
+		User *domain.User `json:"user"`
+	}
+	if err := json.Unmarshal(body, &anon); err != nil {
+		t.Fatalf("decode anonymous: %v", err)
+	}
+	if anon.User != nil {
+		t.Fatalf("anonymous user=%+v want nil", anon.User)
 	}
 
-	// With session header → 200 + payload.
+	// With session header → 200 + {"user":{...}}.
 	req = authedRequest(t, http.MethodGet, srv.URL+"/api/v1/me", user.ID, nil)
-	status, body := do(t, srv.Client(), req)
+	status, body = do(t, srv.Client(), req)
 	if status != http.StatusOK {
 		t.Fatalf("status=%d", status)
 	}
-	var got domain.User
-	if err := json.Unmarshal(body, &got); err != nil {
+	var ok struct {
+		User *domain.User `json:"user"`
+	}
+	if err := json.Unmarshal(body, &ok); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if got.ID != user.ID || got.Email != user.Email {
-		t.Fatalf("got %+v want %+v", got, user)
+	if ok.User == nil || ok.User.ID != user.ID || ok.User.Email != user.Email {
+		t.Fatalf("got %+v want %+v", ok.User, user)
 	}
 }
 

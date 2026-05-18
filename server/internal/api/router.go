@@ -82,9 +82,10 @@ func NewRouter(deps Deps) http.Handler {
 	mux.Handle("POST /api/v1/auth/logout", deps.Auth.RequireUser(
 		http.HandlerFunc(deps.Auth.HandleLogout),
 	))
-	mux.Handle("GET /api/v1/me", deps.Auth.RequireUser(
-		http.HandlerFunc(deps.Auth.HandleMe),
-	))
+	// /me is intentionally NOT wrapped in RequireUser — the frontend calls
+	// it on every page load to figure out auth state and 200 {user:null}
+	// is a cleaner "guest" signal than a 401 with a console error.
+	mux.Handle("GET /api/v1/me", http.HandlerFunc(deps.Auth.HandleMe))
 
 	// --- Sync endpoints (all require a session) ---
 	mux.Handle("GET /api/v1/sync/cards", deps.Auth.RequireUser(
