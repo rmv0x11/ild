@@ -80,6 +80,11 @@ func run() int {
 			Pass: cfg.SMTPPass,
 			From: cfg.SMTPFrom,
 		})
+	case "resend":
+		mailer = auth.NewResendMailer(auth.ResendOptions{
+			APIKey: cfg.ResendAPIKey,
+			From:   cfg.SMTPFrom,
+		})
 	default:
 		mailer = auth.StdoutMailer{}
 	}

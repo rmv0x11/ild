@@ -54,8 +54,14 @@ type Config struct {
 	SMTPPass string
 	SMTPFrom string
 
-	// MailerMode is "smtp" or "stdout". "stdout" prints the magic-link URL to
-	// stdout — handy for local dev so we never accidentally email real users.
+	// ResendAPIKey is the Bearer token for Resend's HTTP API (mailer=resend).
+	// Used in preference to SMTP because most VPS providers block outbound 587.
+	ResendAPIKey string
+
+	// MailerMode is "stdout", "smtp" or "resend".
+	// - stdout: print magic-link to journald (local dev / no real delivery)
+	// - smtp:   classic net/smtp PLAIN auth (requires outbound 587/465)
+	// - resend: POST to Resend HTTP API on 443 (recommended for VPS hosts)
 	MailerMode string
 
 	// MagicLinkTTLMinutes bounds the validity of a magic-link token.
@@ -87,6 +93,7 @@ func Load() (*Config, error) {
 		SMTPUser:            os.Getenv("ILD_SMTP_USER"),
 		SMTPPass:            os.Getenv("ILD_SMTP_PASS"),
 		SMTPFrom:            os.Getenv("ILD_SMTP_FROM"),
+		ResendAPIKey:        os.Getenv("ILD_RESEND_API_KEY"),
 		MailerMode:          getenv("ILD_MAILER_MODE", "stdout"),
 		MagicLinkTTLMinutes: getenvInt("ILD_MAGIC_LINK_TTL_MINUTES", 15),
 		AllowedOrigins:      splitCSV(os.Getenv("ILD_ALLOWED_ORIGINS")),
@@ -125,8 +132,15 @@ func Load() (*Config, error) {
 
 	switch cfg.MailerMode {
 	case "smtp", "stdout":
+	case "resend":
+		if cfg.ResendAPIKey == "" {
+			return nil, errors.New("config: ILD_RESEND_API_KEY is required when ILD_MAILER_MODE=resend")
+		}
+		if cfg.SMTPFrom == "" {
+			return nil, errors.New("config: ILD_SMTP_FROM is required (used as From: address) when ILD_MAILER_MODE=resend")
+		}
 	default:
-		return nil, fmt.Errorf("config: ILD_MAILER_MODE must be 'smtp' or 'stdout', got %q", cfg.MailerMode)
+		return nil, fmt.Errorf("config: ILD_MAILER_MODE must be 'stdout', 'smtp' or 'resend', got %q", cfg.MailerMode)
 	}
 
 	return cfg, nil

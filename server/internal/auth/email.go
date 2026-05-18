@@ -1,12 +1,16 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/smtp"
 	"strings"
 	"time"
@@ -73,6 +77,75 @@ func buildPlainMessage(from, to, subject, body string) []byte {
 	b.WriteString("\r\n")
 	b.WriteString(body)
 	return []byte(b.String())
+}
+
+// ResendOptions carries the credentials/config for ResendMailer.
+type ResendOptions struct {
+	APIKey string
+	From   string
+	// Optional override; default is "https://api.resend.com".
+	BaseURL string
+}
+
+// ResendMailer sends mail via Resend's HTTP API (https://resend.com/docs).
+// This bypasses outbound SMTP entirely (port 587/465 is commonly blocked on
+// VPS providers — including this server) and uses plain HTTPS on 443.
+type ResendMailer struct {
+	opts   ResendOptions
+	client *http.Client
+}
+
+// NewResendMailer constructs a ResendMailer. Sets a sane 10s timeout so the
+// HTTP handler never blocks longer than that on email delivery.
+func NewResendMailer(opts ResendOptions) *ResendMailer {
+	base := opts.BaseURL
+	if base == "" {
+		base = "https://api.resend.com"
+	}
+	opts.BaseURL = base
+	return &ResendMailer{
+		opts:   opts,
+		client: &http.Client{Timeout: 10 * time.Second},
+	}
+}
+
+// Send POSTs to /emails with bearer auth. On non-2xx the response body
+// (which Resend returns as a structured error JSON) is included verbatim in
+// the error so it shows up in journald.
+func (m *ResendMailer) Send(ctx context.Context, to, subject, body string) error {
+	payload, err := jsonEncode(map[string]any{
+		"from":    m.opts.From,
+		"to":      []string{to},
+		"subject": subject,
+		"text":    body,
+	})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		m.opts.BaseURL+"/emails", bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+m.opts.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := m.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("resend: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		var b strings.Builder
+		_, _ = io.CopyN(&b, resp.Body, 2<<10)
+		return fmt.Errorf("resend: status %d: %s", resp.StatusCode, b.String())
+	}
+	return nil
+}
+
+// jsonEncode is a tiny helper so we don't pull encoding/json into the package
+// import list twice — and so it stays trivially testable.
+func jsonEncode(v any) ([]byte, error) {
+	return json.Marshal(v)
 }
 
 // StdoutMailer prints emails to stdout. Useful for local dev (where no real
@@ -145,7 +218,14 @@ func (e *EmailAuth) Request(ctx context.Context, email string) error {
 	link := fmt.Sprintf("%s/api/v1/auth/email/verify?token=%s", e.baseURL, token)
 	body := "Open this link to sign in to ild:\n\n" + link + "\n\nThe link expires in " +
 		e.linkTTL.Round(time.Minute).String() + ". If you did not request it, ignore this message."
-	return e.mailer.Send(ctx, email, "Sign in to ild", body)
+
+	// Defensive 10s timeout. Mailers shouldn't block sign-in flow longer than
+	// the user is willing to wait, and we already wrap callers in HTTP server
+	// write timeouts (15s). Resend HTTP normally responds in <500ms; SMTP can
+	// hang for minutes when the provider blocks port 587 outbound.
+	sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return e.mailer.Send(sendCtx, email, "Sign in to ild", body)
 }
 
 // Verify hashes the supplied token and atomically marks the corresponding
