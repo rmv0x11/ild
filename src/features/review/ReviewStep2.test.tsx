@@ -42,10 +42,9 @@ describe('ReviewStep2', () => {
     expect(screen.getByText('nǐ hǎo')).toBeInTheDocument();
   });
 
-  it('on mount, calls speakChinese once with the word when TTS is available', () => {
+  it('does NOT auto-speak on mount (initial speak is owned by ReviewStep1.onClick to keep user-activation)', () => {
     render(<ReviewStep2 word="你好" pinyin="nǐ hǎo" onNext={vi.fn()} />);
-    expect(speakChineseMock).toHaveBeenCalledTimes(1);
-    expect(speakChineseMock).toHaveBeenCalledWith('你好');
+    expect(speakChineseMock).not.toHaveBeenCalled();
   });
 
   it('"Показать перевод" starts disabled', () => {
@@ -78,16 +77,15 @@ describe('ReviewStep2', () => {
     expect(onNext).toHaveBeenCalledTimes(1);
   });
 
-  it('"Повторить озвучку" calls speakChinese again on click', async () => {
+  it('"Повторить озвучку" calls speakChinese with the word on click', async () => {
     render(<ReviewStep2 word="你好" pinyin="nǐ hǎo" onNext={vi.fn()} />);
-    // initial mount call
-    expect(speakChineseMock).toHaveBeenCalledTimes(1);
-    // wait for the first speak promise to settle so the button becomes enabled again
+    // No auto-speak on mount any more — initial speak is done by ReviewStep1.
+    expect(speakChineseMock).not.toHaveBeenCalled();
     await flushPromises();
 
     const replay = screen.getByRole('button', { name: 'Повторить озвучку' });
     fireEvent.click(replay);
-    expect(speakChineseMock).toHaveBeenCalledTimes(2);
+    expect(speakChineseMock).toHaveBeenCalledTimes(1);
     expect(speakChineseMock).toHaveBeenLastCalledWith('你好');
   });
 

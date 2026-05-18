@@ -19,7 +19,7 @@ const MIN_DELAY_MS = 800;
 export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
   const ttsAvailable = isTtsAvailable();
   const [ttsFinished, setTtsFinished] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(ttsAvailable);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [lastErrorType, setLastErrorType] = useState<string | null>(null);
   const minTimerRef = useRef<number | null>(null);
 
@@ -36,20 +36,16 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
   };
 
   useEffect(() => {
+    // We deliberately do NOT call speakChinese() here. The initial playback is
+    // started inside ReviewStep1.onClick (which keeps the browser's
+    // user-activation token alive — critical for Chrome's autoplay rules).
+    // Doing speak() both there and here used to cancel the first call, which
+    // is exactly the symptom the user reported ("раньше работало, перестало").
+    // The replay button below remains a legitimate user-gesture speak path.
     minTimerRef.current = window.setTimeout(() => {
       setTtsFinished(true);
       minTimerRef.current = null;
     }, MIN_DELAY_MS);
-
-    if (ttsAvailable) {
-      speakChinese(word)
-        .then((res) => {
-          if (res.errorType) setLastErrorType(res.errorType);
-        })
-        .finally(() => {
-          setIsSpeaking(false);
-        });
-    }
 
     return () => {
       if (minTimerRef.current !== null) {
@@ -58,8 +54,6 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
       }
       cancelSpeech();
     };
-    // Mount-only: parent re-keys this component on word change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const canAdvance = ttsFinished;

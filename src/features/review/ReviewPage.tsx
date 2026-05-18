@@ -6,6 +6,7 @@ import type { Card as DomainCard, Rating } from '@/types/domain';
 import { rateCard } from '@/lib/sm2/algorithm';
 import { getNextDueCard, getStats, updateCard } from '@/lib/storage/cards';
 import { logReview } from '@/lib/storage/reviews';
+import { speakChinese } from '@/lib/tts/speak';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
@@ -121,6 +122,9 @@ function ReviewCardSession({ card }: { card: DomainCard }) {
 
       if (step === 1 && (e.key === ' ' || e.key === 'Enter')) {
         e.preventDefault();
+        // Mirror ReviewStep1.onClick: fire TTS synchronously inside the
+        // user-keypress event so the browser keeps its autoplay activation.
+        void speakChinese(card.word);
         setStep(2);
       } else if (step === 2 && (e.key === ' ' || e.key === 'Enter')) {
         const btn = document.querySelector<HTMLButtonElement>('button[data-step3-trigger]');
