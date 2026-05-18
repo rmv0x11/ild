@@ -118,7 +118,11 @@ export function UserBadge() {
           </Button>
         </div>
       )}
-      <SetPasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
+      <SetPasswordDialog
+        key={passwordOpen ? 'open' : 'closed'}
+        open={passwordOpen}
+        onClose={() => setPasswordOpen(false)}
+      />
     </div>
   );
 }

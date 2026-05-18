@@ -26,13 +26,12 @@ export function SetPasswordDialog({ open, onClose }: SetPasswordDialogProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset form whenever the dialog (re)opens; Esc closes it.
+  // Esc closes the dialog. State reset is handled by re-keying this component
+  // on open from the parent (see UserBadge), so a fresh mount = empty form;
+  // we no longer setState() inside useEffect (forbidden by
+  // react-hooks/set-state-in-effect).
   useEffect(() => {
     if (!open) return undefined;
-    setPasswordValue('');
-    setConfirm('');
-    setError(null);
-    setSubmitting(false);
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose();
     };
