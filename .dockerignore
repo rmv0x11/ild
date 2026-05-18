@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+.git
+.idea
+.vscode
+.claude
+*.log
+.DS_Store
+README.md
+CLAUDE.md
+.husky
+docker
+Dockerfile
+docker-compose.yml
+.dockerignore
