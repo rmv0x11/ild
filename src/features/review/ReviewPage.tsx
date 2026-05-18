@@ -148,7 +148,7 @@ function ReviewCardSession({ card }: { card: DomainCard }) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [step, handleRate]);
+  }, [step, handleRate, card.word]);
 
   return (
     <>

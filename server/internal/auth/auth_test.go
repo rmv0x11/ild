@@ -22,21 +22,23 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockStore struct {
-	mu         sync.Mutex
-	users      map[string]*domain.User      // by id
-	usersEmail map[string]*domain.User      // by email
-	oauth      map[string]*domain.OAuthLink // provider+"|"+providerID -> link
-	sessions   map[string]*domain.Session
-	magic      map[string]*domain.MagicLink // by tokenHash
+	mu            sync.Mutex
+	users         map[string]*domain.User      // by id
+	usersEmail    map[string]*domain.User      // by email
+	usersUsername map[string]*domain.User      // by username (case-sensitive)
+	oauth         map[string]*domain.OAuthLink // provider+"|"+providerID -> link
+	sessions      map[string]*domain.Session
+	magic         map[string]*domain.MagicLink // by tokenHash
 }
 
 func newMockStore() *mockStore {
 	return &mockStore{
-		users:      map[string]*domain.User{},
-		usersEmail: map[string]*domain.User{},
-		oauth:      map[string]*domain.OAuthLink{},
-		sessions:   map[string]*domain.Session{},
-		magic:      map[string]*domain.MagicLink{},
+		users:         map[string]*domain.User{},
+		usersEmail:    map[string]*domain.User{},
+		usersUsername: map[string]*domain.User{},
+		oauth:         map[string]*domain.OAuthLink{},
+		sessions:      map[string]*domain.Session{},
+		magic:         map[string]*domain.MagicLink{},
 	}
 }
 
@@ -44,11 +46,19 @@ func (m *mockStore) CreateUser(_ context.Context, u *domain.User) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, exists := m.usersEmail[u.Email]; exists {
-		return errors.New("dup email")
+		return errors.New("UNIQUE constraint failed: users.email")
+	}
+	if u.Username != "" {
+		if _, exists := m.usersUsername[u.Username]; exists {
+			return errors.New("UNIQUE constraint failed: users.username")
+		}
 	}
 	cp := *u
 	m.users[u.ID] = &cp
 	m.usersEmail[u.Email] = &cp
+	if u.Username != "" {
+		m.usersUsername[u.Username] = &cp
+	}
 	return nil
 }
 func (m *mockStore) FindUserByID(_ context.Context, id string) (*domain.User, error) {
@@ -68,6 +78,37 @@ func (m *mockStore) FindUserByEmail(_ context.Context, email string) (*domain.Us
 		return &cp, nil
 	}
 	return nil, nil
+}
+func (m *mockStore) FindUserByUsername(_ context.Context, username string) (*domain.User, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if username == "" {
+		return nil, nil
+	}
+	if u, ok := m.usersUsername[username]; ok {
+		cp := *u
+		return &cp, nil
+	}
+	return nil, nil
+}
+func (m *mockStore) UpdateUserPasswordHash(_ context.Context, userID, hash string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u, ok := m.users[userID]
+	if !ok {
+		return errors.New("user not found")
+	}
+	u.PasswordHash = hash
+	// Also update the email/username views so future lookups see the new hash.
+	if v, ok := m.usersEmail[u.Email]; ok {
+		v.PasswordHash = hash
+	}
+	if u.Username != "" {
+		if v, ok := m.usersUsername[u.Username]; ok {
+			v.PasswordHash = hash
+		}
+	}
+	return nil
 }
 func (m *mockStore) LinkOAuth(_ context.Context, link *domain.OAuthLink) error {
 	m.mu.Lock()

@@ -110,6 +110,148 @@ func TestFindUserByID_AndByEmail(t *testing.T) {
 	}
 }
 
+// TestMigration002_AddsUsernamePasswordColumns asserts the schema has the
+// columns introduced in 002_password_auth.sql. Reading PRAGMA table_info
+// keeps the test independent of how we query users elsewhere.
+func TestMigration002_AddsUsernamePasswordColumns(t *testing.T) {
+	d := newTestDB(t)
+	rows, err := d.SQL().Query(`PRAGMA table_info(users)`)
+	if err != nil {
+		t.Fatalf("table_info: %v", err)
+	}
+	defer rows.Close()
+	cols := map[string]bool{}
+	for rows.Next() {
+		var (
+			cid          int
+			name, ctype  string
+			notnull, pk  int
+			defaultVal   any
+		)
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &defaultVal, &pk); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		cols[name] = true
+	}
+	for _, want := range []string{"id", "email", "username", "name", "password_hash", "created_at"} {
+		if !cols[want] {
+			t.Fatalf("column %q missing after migrations; got %v", want, cols)
+		}
+	}
+}
+
+// TestCreateUser_PersistsUsernameAndPasswordHash covers the new round-trip
+// through the insert path: a freshly-created user with both new fields
+// should be readable back via every Find* method.
+func TestCreateUser_PersistsUsernameAndPasswordHash(t *testing.T) {
+	d := newTestDB(t)
+	u := &domain.User{
+		Email:        "pw@example.com",
+		Username:     "pwuser",
+		PasswordHash: "$2a$12$abcdefghijklmnopqrstuvwxyzABCDEF0123456789ABCD",
+		Name:         "PW User",
+	}
+	if err := d.CreateUser(context.Background(), u); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	got, err := d.FindUserByID(context.Background(), u.ID)
+	if err != nil || got == nil {
+		t.Fatalf("by id: got=%v err=%v", got, err)
+	}
+	if got.Username != "pwuser" || got.PasswordHash != u.PasswordHash {
+		t.Fatalf("round-trip mismatch: %+v", got)
+	}
+
+	gotByEmail, err := d.FindUserByEmail(context.Background(), "pw@example.com")
+	if err != nil || gotByEmail == nil {
+		t.Fatalf("by email: %v / %+v", err, gotByEmail)
+	}
+	if gotByEmail.Username != "pwuser" || gotByEmail.PasswordHash != u.PasswordHash {
+		t.Fatalf("by-email round-trip mismatch: %+v", gotByEmail)
+	}
+
+	gotByUsername, err := d.FindUserByUsername(context.Background(), "pwuser")
+	if err != nil || gotByUsername == nil {
+		t.Fatalf("by username: %v / %+v", err, gotByUsername)
+	}
+	if gotByUsername.ID != u.ID {
+		t.Fatalf("by-username wrong user: %+v", gotByUsername)
+	}
+}
+
+// TestCreateUser_EmptyUsernameStaysNull verifies the legacy magic-link /
+// OAuth path (Username == "") inserts a SQL NULL — the partial unique
+// index would otherwise reject multiple username-less rows.
+func TestCreateUser_EmptyUsernameStaysNull(t *testing.T) {
+	d := newTestDB(t)
+	if err := d.CreateUser(context.Background(), &domain.User{Email: "a@nu.l"}); err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	if err := d.CreateUser(context.Background(), &domain.User{Email: "b@nu.l"}); err != nil {
+		t.Fatalf("second: %v", err)
+	}
+	var nulls int
+	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM users WHERE username IS NULL`).Scan(&nulls); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if nulls != 2 {
+		t.Fatalf("expected 2 users with NULL username, got %d", nulls)
+	}
+}
+
+// TestFindUserByUsername_CaseSensitive ensures lookups discriminate between
+// "Alice" and "alice" — both are stored as distinct usernames and only an
+// exact match returns the row.
+func TestFindUserByUsername_CaseSensitive(t *testing.T) {
+	d := newTestDB(t)
+	u := &domain.User{Email: "case@x.y", Username: "Alice"}
+	if err := d.CreateUser(context.Background(), u); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	if got, _ := d.FindUserByUsername(context.Background(), "Alice"); got == nil || got.ID != u.ID {
+		t.Fatalf("expected hit for exact case: %+v", got)
+	}
+	if got, _ := d.FindUserByUsername(context.Background(), "alice"); got != nil {
+		t.Fatalf("expected miss for lowercase: %+v", got)
+	}
+	if got, _ := d.FindUserByUsername(context.Background(), ""); got != nil {
+		t.Fatalf("empty username should return nil, got %+v", got)
+	}
+}
+
+// TestUpdateUserPasswordHash_WritesAndReads asserts UpdateUserPasswordHash
+// is visible to subsequent reads. The future password-reset flow depends
+// on this; the register flow already uses CreateUser to persist the hash.
+func TestUpdateUserPasswordHash_WritesAndReads(t *testing.T) {
+	d := newTestDB(t)
+	u := &domain.User{Email: "upd@x.y", Username: "updateme"}
+	if err := d.CreateUser(context.Background(), u); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := d.UpdateUserPasswordHash(context.Background(), u.ID, "$2a$12$some-new-hash"); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	got, _ := d.FindUserByID(context.Background(), u.ID)
+	if got == nil || got.PasswordHash != "$2a$12$some-new-hash" {
+		t.Fatalf("expected updated hash, got %+v", got)
+	}
+}
+
+// TestCreateUser_UsernameUniqueViolation ensures the partial unique index
+// rejects a second user trying to take an already-used username.
+func TestCreateUser_UsernameUniqueViolation(t *testing.T) {
+	d := newTestDB(t)
+	if err := d.CreateUser(context.Background(), &domain.User{Email: "a@u.x", Username: "shared"}); err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	err := d.CreateUser(context.Background(), &domain.User{Email: "b@u.x", Username: "shared"})
+	if err == nil {
+		t.Fatal("expected unique-constraint error on duplicate username")
+	}
+}
+
 func TestLinkOAuth_AndFindUserByOAuth(t *testing.T) {
 	d := newTestDB(t)
 	u := newUser(t, d, "ouser@example.com")

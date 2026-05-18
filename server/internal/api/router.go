@@ -43,6 +43,12 @@ type Deps struct {
 	GoogleStart    http.HandlerFunc
 	GoogleCallback http.HandlerFunc
 
+	// AuthRegister/AuthLogin handle username+password sign-up and sign-in.
+	// Wired by main.go to auth.Service.{HandleRegister,HandleLogin}. The
+	// router treats them as ordinary handler funcs so tests can stub them.
+	AuthRegister http.HandlerFunc
+	AuthLogin    http.HandlerFunc
+
 	// AllowedOrigins controls CORS. Origins not in the list get a clean
 	// 204 on preflight but no Allow-* headers — the browser blocks.
 	AllowedOrigins []string
@@ -72,6 +78,17 @@ func NewRouter(deps Deps) http.Handler {
 	mux.HandleFunc("POST /api/v1/auth/email/request", deps.Email.HandleRequest)
 	if deps.EmailVerify != nil {
 		mux.HandleFunc("GET /api/v1/auth/email/verify", deps.EmailVerify)
+	}
+
+	// Username/password endpoints — sit alongside magic-link and OAuth.
+	// All three can produce a session cookie; downstream handlers do not
+	// care which one issued it. If main.go did not wire them (tests, or a
+	// future minimal config) the route is simply not registered.
+	if deps.AuthRegister != nil {
+		mux.HandleFunc("POST /api/v1/auth/register", deps.AuthRegister)
+	}
+	if deps.AuthLogin != nil {
+		mux.HandleFunc("POST /api/v1/auth/login", deps.AuthLogin)
 	}
 
 	if deps.GoogleStart != nil && deps.GoogleCallback != nil {

@@ -11,6 +11,16 @@ interface MeResponse {
   user: AuthUser | null;
 }
 
+interface AuthUserResponse {
+  user: AuthUser;
+}
+
+export interface RegisterRequest {
+  username: string;
+  email: string;
+  password: string;
+}
+
 /**
  * Fetches the current session user. A 401 from the backend is the expected
  * "guest" response — we swallow it here and return `{user: null}` so the
@@ -50,4 +60,41 @@ export async function logout(): Promise<void> {
  */
 export function googleStartUrl(): string {
   return `${API_URL}/api/v1/auth/google/start`;
+}
+
+/**
+ * Creates an account with username + email + password. Backend sets the
+ * session cookie on success, so the caller should call `refresh()` to pick
+ * up the new identity.
+ *
+ * Error contract:
+ *   - 409 `{error: 'email_taken'}` / `{error: 'username_taken'}` → re-thrown
+ *     as `ApiError` with `status=409` and `code` set so the UI can map to a
+ *     specific field error.
+ *   - 400 `{error: 'validation'}` → `ApiError(400, code='validation')` for
+ *     server-side validation failures the client missed.
+ * Other errors propagate.
+ */
+export async function registerWithPassword(req: RegisterRequest): Promise<AuthUser> {
+  const { user } = await apiPost<AuthUserResponse>('/api/v1/auth/register', req);
+  return user;
+}
+
+/**
+ * Logs in with an identifier (email or username) + password. Backend sets
+ * the session cookie on success.
+ *
+ * Throws `ApiError(401, code='invalid_credentials')` for a bad pair so the
+ * UI can show a single generic "wrong credentials" message (we intentionally
+ * do not distinguish "no such user" from "wrong password").
+ */
+export async function loginWithPassword(
+  identifier: string,
+  password: string,
+): Promise<AuthUser> {
+  const { user } = await apiPost<AuthUserResponse>('/api/v1/auth/login', {
+    identifier,
+    password,
+  });
+  return user;
 }

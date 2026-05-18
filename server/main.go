@@ -100,6 +100,8 @@ func run() int {
 		Auth:           authSvc,
 		Email:          emailAuth,
 		EmailVerify:    authSvc.HandleEmailVerify(emailAuth),
+		AuthRegister:   authSvc.HandleRegister,
+		AuthLogin:      authSvc.HandleLogin,
 		AllowedOrigins: cfg.AllowedOrigins,
 	}
 

@@ -178,7 +178,15 @@ export function speakChinese(text: string): Promise<SpeakResult> {
         utterance.rate = 0.9;
         utterance.pitch = 1;
         utterance.volume = 1;
-        if (voice) utterance.voice = voice;
+        // Only PIN the voice when it's a local (offline) one. For remote
+        // (Siri / Google Cloud) voices we deliberately leave utterance.voice
+        // null: Chrome 138+ refuses to play remote voices explicitly assigned,
+        // but the browser's own fallback (driven by lang="zh-CN") will pick
+        // any working engine — that's the path that "used to work" before
+        // we started force-assigning voices. Best of both worlds.
+        if (voice && voice.localService) {
+          utterance.voice = voice;
+        }
         utterance.onend = () => {
           console.log('[tts] onend', { voice: voice?.name, text });
           finish(true);

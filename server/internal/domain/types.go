@@ -64,11 +64,20 @@ type Review struct {
 }
 
 // User represents an authenticated account.
+//
+// Username and PasswordHash were added with the username+password
+// registration flow (migration 002_password_auth.sql). They are optional:
+// magic-link and OAuth users have no password on file and most do not
+// claim a username. PasswordHash carries `json:"-"` so the bcrypt digest
+// never leaks through any API response — every handler can safely splat
+// the User into JSON.
 type User struct {
-	ID        string `json:"id"`
-	Email     string `json:"email"`
-	Name      string `json:"name,omitempty"`
-	CreatedAt int64  `json:"createdAt"`
+	ID           string `json:"id"`
+	Email        string `json:"email"`
+	Username     string `json:"username,omitempty"`
+	Name         string `json:"name,omitempty"`
+	PasswordHash string `json:"-"`
+	CreatedAt    int64  `json:"createdAt"`
 }
 
 // Session is a server-side bearer record; the cookie carries the (HMAC-signed) ID.

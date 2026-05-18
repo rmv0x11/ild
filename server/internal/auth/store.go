@@ -18,6 +18,8 @@ type Store interface {
 	CreateUser(ctx context.Context, u *domain.User) error
 	FindUserByID(ctx context.Context, id string) (*domain.User, error)
 	FindUserByEmail(ctx context.Context, email string) (*domain.User, error)
+	FindUserByUsername(ctx context.Context, username string) (*domain.User, error)
+	UpdateUserPasswordHash(ctx context.Context, userID, hash string) error
 
 	LinkOAuth(ctx context.Context, link *domain.OAuthLink) error
 	FindUserByOAuth(ctx context.Context, provider, providerID string) (*domain.User, error)
