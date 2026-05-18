@@ -29,6 +29,45 @@ export function warmUpTts(): void {
   }
 }
 
+// Preferred Chinese voices on macOS, in priority order. Tingting / Lili /
+// Mei-Jia are the classic Apple speech voices — they actually produce audio
+// in Chrome. Newer "Eddy", "Flo", "Reed", "Sandy", "Shelley" are Siri-style
+// voices that Chrome (138+) registers in getVoices() but refuses to render,
+// which is exactly the regression the user is hitting: Safari picks Tingting
+// (works), Chrome picks Eddy first (silent). We bypass Chrome's default
+// ordering by explicitly preferring the known-working names.
+const PREFERRED_VOICE_NAMES = [
+  'tingting',
+  'ting-ting',
+  '婷婷',
+  'lili',
+  'mei-jia',
+  'meijia',
+  'mei jia',
+  'sin-ji',
+  'sinji',
+];
+
+// Voices that ARE listed but typically don't play in Chrome — we keep them as
+// last-resort fallback rather than first choice.
+const DEPRIORITISED_VOICE_NAMES = [
+  'eddy',
+  'flo',
+  'reed',
+  'sandy',
+  'shelley',
+  'grandma',
+  'grandpa',
+];
+
+function voicePriority(v: SpeechSynthesisVoice): number {
+  const n = (v.name || '').toLowerCase();
+  const idx = PREFERRED_VOICE_NAMES.findIndex((p) => n.includes(p));
+  if (idx >= 0) return idx; // 0 .. PREFERRED.length-1
+  if (DEPRIORITISED_VOICE_NAMES.some((d) => n.includes(d))) return 1000;
+  return 100; // unknown but listed — neutral
+}
+
 export function getChineseVoice(): SpeechSynthesisVoice | null {
   if (!isTtsAvailable()) return null;
   ensureVoicesListener();
@@ -38,8 +77,37 @@ export function getChineseVoice(): SpeechSynthesisVoice | null {
   if (!cachedVoices || cachedVoices.length === 0) return null;
   const chinese = cachedVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('zh'));
   if (chinese.length === 0) return null;
-  const zhCN = chinese.find((v) => v.lang.toLowerCase().startsWith('zh-cn'));
-  return zhCN ?? chinese[0];
+
+  // Sort by:
+  //   1. localService desc (local before remote)
+  //   2. zh-CN before zh-* others
+  //   3. voicePriority (Tingting/Lili before Eddy/Siri)
+  const scored = [...chinese].sort((a, b) => {
+    const localA = a.localService ? 0 : 1;
+    const localB = b.localService ? 0 : 1;
+    if (localA !== localB) return localA - localB;
+    const zhA = a.lang.toLowerCase().startsWith('zh-cn') ? 0 : 1;
+    const zhB = b.lang.toLowerCase().startsWith('zh-cn') ? 0 : 1;
+    if (zhA !== zhB) return zhA - zhB;
+    return voicePriority(a) - voicePriority(b);
+  });
+  return scored[0];
+}
+
+/**
+ * List all Chinese voices the browser knows about. Used by the debug UI
+ * so a user can see why a particular voice was picked (or wasn't).
+ */
+export function listChineseVoices(): VoiceInfo[] {
+  if (!isTtsAvailable()) return [];
+  ensureVoicesListener();
+  if (!cachedVoices || cachedVoices.length === 0) {
+    cachedVoices = window.speechSynthesis.getVoices();
+  }
+  if (!cachedVoices) return [];
+  return cachedVoices
+    .filter((v) => v.lang && v.lang.toLowerCase().startsWith('zh'))
+    .map((v) => ({ name: v.name || v.lang, lang: v.lang, local: !!v.localService }));
 }
 
 export interface VoiceInfo {

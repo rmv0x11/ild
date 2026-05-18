@@ -5,6 +5,7 @@ import {
   cancelSpeech,
   getChineseVoiceInfo,
   isTtsAvailable,
+  listChineseVoices,
   speakChinese,
 } from '@/lib/tts/speak';
 
@@ -145,6 +146,10 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
           <div className="font-semibold">Последний speak:</div>
           <pre className="overflow-x-auto whitespace-pre-wrap text-[10px]">
             {JSON.stringify(lastResult, null, 2)}
+          </pre>
+          <div className="mt-2 font-semibold">Все zh-голоса:</div>
+          <pre className="overflow-x-auto whitespace-pre-wrap text-[10px]">
+            {JSON.stringify(listChineseVoices(), null, 2)}
           </pre>
         </div>
       )}
