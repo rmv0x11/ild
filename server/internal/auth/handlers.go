@@ -34,7 +34,7 @@ func (s *Service) findOrCreateUserByEmail(ctx context.Context, email, name strin
 		ID:        uuid.NewString(),
 		Email:     email,
 		Name:      name,
-		CreatedAt: time.Now().Unix(),
+		CreatedAt: time.Now().UnixMilli(),
 	}
 	if err := s.store.CreateUser(ctx, u); err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func (s *Service) HandleGoogleCallback(g *GoogleProvider) http.HandlerFunc {
 				UserID:     user.ID,
 				Provider:   "google",
 				ProviderID: gu.ID,
-				CreatedAt:  time.Now().Unix(),
+				CreatedAt:  time.Now().UnixMilli(),
 			}); err != nil {
 				http.Error(w, "store error", http.StatusInternalServerError)
 				return

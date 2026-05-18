@@ -132,7 +132,7 @@ func (e *EmailAuth) Request(ctx context.Context, email string) error {
 		return err
 	}
 	token := base64.RawURLEncoding.EncodeToString(raw[:])
-	expires := time.Now().Add(e.linkTTL).Unix()
+	expires := time.Now().Add(e.linkTTL).UnixMilli()
 
 	if err := e.store.CreateMagicLink(ctx, &domain.MagicLink{
 		TokenHash: hashToken(token),
