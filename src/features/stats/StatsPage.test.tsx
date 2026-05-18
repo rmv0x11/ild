@@ -1,9 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import type { Card } from '@/types/domain';
 import { db } from '@/lib/storage/db';
 import { addCards, clearAll } from '@/lib/storage/cards';
 import { StatsPage } from './StatsPage';
+
+function renderStats() {
+  return render(
+    <MemoryRouter>
+      <StatsPage />
+    </MemoryRouter>,
+  );
+}
 
 const NOW = 1_700_000_000_000;
 
@@ -22,7 +31,7 @@ describe('StatsPage', () => {
   });
 
   it('renders zero stats for an empty deck', async () => {
-    render(<StatsPage />);
+    renderStats();
 
     // Wait for useLiveQuery to resolve and the "Загрузка…" placeholder to be replaced.
     await waitFor(() => {
@@ -55,7 +64,7 @@ describe('StatsPage', () => {
       NOW,
     );
 
-    render(<StatsPage />);
+    renderStats();
 
     await waitFor(() => {
       expect(findTileValue('Всего').textContent).toBe('3');
@@ -85,7 +94,7 @@ describe('StatsPage', () => {
     };
     await db.cards.put(matureCard);
 
-    render(<StatsPage />);
+    renderStats();
 
     await waitFor(() => {
       expect(findTileValue('Зрелые').textContent).toBe('1');

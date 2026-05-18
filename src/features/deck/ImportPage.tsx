@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { Download, Trash2, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import type { CsvRow } from '@/types/domain';
 import { parseDeckCsv, SAMPLE_CSV } from '@/lib/csv/parser';
 import { addCards, clearAll } from '@/lib/storage/cards';
@@ -80,9 +81,11 @@ export function ImportPage() {
       setResult(res);
       setParsed(null);
       if (inputRef.current) inputRef.current.value = '';
+      toast.success(`Добавлено: ${res.added}, пропущено: ${res.skipped}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Не удалось импортировать колоду';
       setError(message);
+      toast.error(`Не удалось импортировать: ${message}`);
     } finally {
       setImporting(false);
     }
@@ -98,6 +101,7 @@ export function ImportPage() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+    toast.success('Файл ild-sample.csv загружен');
   };
 
   const handleClear = async (): Promise<void> => {
@@ -106,9 +110,11 @@ export function ImportPage() {
       await clearAll();
       setResult(null);
       setParsed(null);
+      toast.success('Колода очищена');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Не удалось очистить колоду';
       setError(message);
+      toast.error(`Ошибка очистки: ${message}`);
     }
   };
 

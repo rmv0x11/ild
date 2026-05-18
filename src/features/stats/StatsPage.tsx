@@ -1,7 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useNavigate } from 'react-router-dom';
 import { getStats } from '@/lib/storage/cards';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { resetOnboarding } from '@/features/onboarding/onboardingState';
 
 interface Tile {
   label: string;
@@ -10,6 +13,7 @@ interface Tile {
 
 export function StatsPage() {
   const stats = useLiveQuery(() => getStats(Date.now()), []);
+  const navigate = useNavigate();
 
   if (!stats) {
     return <div className="py-10 text-center text-muted-foreground">Загрузка…</div>;
@@ -27,6 +31,11 @@ export function StatsPage() {
   ];
 
   const maturePct = stats.total > 0 ? (stats.mature / stats.total) * 100 : 0;
+
+  const handleReplayOnboarding = (): void => {
+    resetOnboarding();
+    navigate('/');
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,6 +66,22 @@ export function StatsPage() {
           </Card>
         ))}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Обучение</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Хотите освежить вводный обзор сервиса?
+          </p>
+          <div>
+            <Button variant="outline" onClick={handleReplayOnboarding}>
+              Показать обучение ещё раз
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

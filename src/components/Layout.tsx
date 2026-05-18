@@ -1,10 +1,11 @@
 import { Outlet, NavLink } from 'react-router-dom';
+import { BarChart3, Brain, Upload, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navItems = [
-  { to: '/review', label: 'Повторение' },
-  { to: '/import', label: 'Импорт' },
-  { to: '/stats', label: 'Статистика' },
+const navItems: { to: string; label: string; Icon: LucideIcon }[] = [
+  { to: '/review', label: 'Повторение', Icon: Brain },
+  { to: '/import', label: 'Импорт', Icon: Upload },
+  { to: '/stats', label: 'Статистика', Icon: BarChart3 },
 ];
 
 export function Layout() {
@@ -12,22 +13,26 @@ export function Layout() {
     <div className="min-h-dvh bg-background text-foreground">
       <header className="border-b">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-          <NavLink to="/review" className="text-xl font-bold tracking-tight">
-            ild
+          <NavLink to="/review" aria-label="ild" className="flex items-baseline gap-2">
+            <span className="text-xl font-bold tracking-tight">ild</span>
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              китайский с SM-2
+            </span>
           </NavLink>
           <nav className="flex items-center gap-4 text-sm">
-            {navItems.map((item) => (
+            {navItems.map(({ to, label, Icon }) => (
               <NavLink
-                key={item.to}
-                to={item.to}
+                key={to}
+                to={to}
                 className={({ isActive }) =>
                   cn(
-                    'text-muted-foreground transition-colors hover:text-foreground',
+                    'flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground',
                     isActive && 'font-bold text-foreground underline underline-offset-4',
                   )
                 }
               >
-                {item.label}
+                <Icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{label}</span>
               </NavLink>
             ))}
           </nav>

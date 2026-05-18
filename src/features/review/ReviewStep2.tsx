@@ -72,7 +72,7 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
           <Volume2 />
           Повторить озвучку
         </Button>
-        <Button size="lg" onClick={onNext} disabled={!canAdvance}>
+        <Button size="lg" onClick={onNext} disabled={!canAdvance} data-step3-trigger>
           Показать перевод
         </Button>
       </div>
