@@ -207,15 +207,19 @@ describe('tts/speak', () => {
 
       await expect(mod.speakChinese('你好')).resolves.toMatchObject({ spoke: true });
 
-      // cancel() is no longer unconditional — idle engines skip cancel to
-      // avoid Chrome's "stuck cancelling" quirk. Idle mock => zero cancels.
-      expect(synth!.cancel).not.toHaveBeenCalled();
+      // cancel() is called unconditionally to wake macOS Chrome's speech
+      // engine — the wake-up call is part of "the path that works".
+      expect(synth!.cancel).toHaveBeenCalledTimes(1);
       expect(synth!.speak).toHaveBeenCalledTimes(1);
       expect(lastUtterance).not.toBeNull();
       expect(lastUtterance!.text).toBe('你好');
       expect(lastUtterance!.lang).toBe('zh-CN');
       expect(lastUtterance!.rate).toBe(0.9);
-      expect(lastUtterance!.voice).toBe(zhCN);
+      // We intentionally do NOT pin utterance.voice; the browser resolves
+      // the best engine from lang="zh-CN" on its own. This is the regression
+      // fix: explicit Apple Siri voices were being silently dropped by
+      // Chrome 138+ when assigned via utterance.voice.
+      expect(lastUtterance!.voice).toBeNull();
     });
 
     it('resolves (does not reject) when utterance.onerror is fired', async () => {

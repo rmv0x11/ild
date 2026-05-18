@@ -11,15 +11,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, LogOut } from 'lucide-react';
+import { ChevronDown, KeyRound, LogOut } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from './useAuth';
+import { SetPasswordDialog } from './SetPasswordDialog';
 
 export function UserBadge() {
   const { status, user, logout, refresh } = useAuth();
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   // Outside-click and Escape both dismiss the popover. We attach listeners
@@ -88,8 +90,20 @@ export function UserBadge() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-1 w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+          className="absolute right-0 z-20 mt-1 w-56 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
         >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setOpen(false);
+              setPasswordOpen(true);
+            }}
+            className="w-full justify-start"
+          >
+            <KeyRound className="h-4 w-4" />
+            Установить пароль
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -104,6 +118,7 @@ export function UserBadge() {
           </Button>
         </div>
       )}
+      <SetPasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
     </div>
   );
 }

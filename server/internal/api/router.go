@@ -49,6 +49,12 @@ type Deps struct {
 	AuthRegister http.HandlerFunc
 	AuthLogin    http.HandlerFunc
 
+	// AuthSetPassword sets a password on the currently-signed-in user
+	// (e.g. user signed in via magic-link and now wants password login).
+	// Wrapped in RequireUser by the router so an unauthenticated request
+	// receives a clean 401 instead of touching the handler.
+	AuthSetPassword http.HandlerFunc
+
 	// AllowedOrigins controls CORS. Origins not in the list get a clean
 	// 204 on preflight but no Allow-* headers — the browser blocks.
 	AllowedOrigins []string
@@ -89,6 +95,10 @@ func NewRouter(deps Deps) http.Handler {
 	}
 	if deps.AuthLogin != nil {
 		mux.HandleFunc("POST /api/v1/auth/login", deps.AuthLogin)
+	}
+	if deps.AuthSetPassword != nil {
+		mux.Handle("POST /api/v1/auth/set-password",
+			deps.Auth.RequireUser(http.HandlerFunc(deps.AuthSetPassword)))
 	}
 
 	if deps.GoogleStart != nil && deps.GoogleCallback != nil {

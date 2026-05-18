@@ -197,6 +197,58 @@ func (s *Service) HandleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
 
+// setPasswordRequest is the JSON body for HandleSetPassword. Only a single
+// `password` field — username can be set during HandleRegister or remains
+// NULL for magic-link/OAuth users.
+type setPasswordRequest struct {
+	Password string `json:"password"`
+}
+
+// HandleSetPassword lets the currently-signed-in user set or change their
+// password. This is how a magic-link / OAuth user can opt into the
+// password-login flow without recreating the account.
+//
+// The router wraps this in RequireUser, so by the time we get here the
+// request is guaranteed to carry a valid session.
+//
+//	POST /api/v1/auth/set-password   { "password": "min-8-chars" }
+//	  200 {"ok":true}                       — hash stored
+//	  400 {"error":"invalid_password"}      — failed length check
+//	  500                                   — bcrypt or DB failure
+func (s *Service) HandleSetPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	user := UserFrom(r.Context())
+	if user == nil {
+		// Defence in depth: router should have already returned 401 via
+		// RequireUser, but if someone wires the handler without that wrap
+		// we still refuse to operate on an anonymous request.
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
+	var body setPasswordRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<14)).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "bad_request"})
+		return
+	}
+	if len(body.Password) < passwordMinLength || len(body.Password) > passwordMaxLength {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_password"})
+		return
+	}
+	hash, err := HashPassword(body.Password)
+	if err != nil {
+		http.Error(w, "hash error", http.StatusInternalServerError)
+		return
+	}
+	if err := s.store.UpdateUserPasswordHash(r.Context(), user.ID, hash); err != nil {
+		http.Error(w, "store error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 // HandleLogout terminates the session and clears the cookie.
 func (s *Service) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

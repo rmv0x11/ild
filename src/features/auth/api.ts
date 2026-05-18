@@ -98,3 +98,17 @@ export async function loginWithPassword(
   });
   return user;
 }
+
+/**
+ * Sets a password for the currently signed-in user. Used to upgrade a
+ * magic-link or OAuth account so the owner can also sign in with a
+ * password in the future.
+ *
+ * Backend contract:
+ *   - 200 `{ok: true}` — hash stored.
+ *   - 400 `{error: 'invalid_password'}` — failed length check (8..200).
+ *   - 401 — no active session (caller must be logged in).
+ */
+export async function setPassword(password: string): Promise<void> {
+  await apiPost<{ ok: true }>('/api/v1/auth/set-password', { password });
+}
