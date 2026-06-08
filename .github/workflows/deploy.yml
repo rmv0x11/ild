@@ -35,10 +35,14 @@ jobs:
       - name: Build for GitHub Pages
         env:
           # Backend public URL (TryCloudflare while we don't have a domain).
-          # Falls back to repo variable VITE_API_URL if set in
-          # Settings → Secrets and variables → Actions → Variables;
-          # otherwise the literal default below is used.
-          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://translated-knife-literature-asp.trycloudflare.com' }}
+          # NOTE: the TryCloudflare quick-tunnel URL is EPHEMERAL — it changes
+          # every time cloudflared restarts (e.g. on server reboot), which
+          # silently breaks the deployed frontend. Authoritative source is the
+          # repo variable VITE_API_URL (Settings → Secrets and variables →
+          # Actions → Variables); update it + re-run this workflow after any
+          # tunnel-URL change. The literal below is only a fallback and must be
+          # kept in sync with the live tunnel.
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://databases-nested-collaborative-twin.trycloudflare.com' }}
           VITE_GOOGLE_ENABLED: ${{ vars.VITE_GOOGLE_ENABLED || 'false' }}
         run: npm run build
 
