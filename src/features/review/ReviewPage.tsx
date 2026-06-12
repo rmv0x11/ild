@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useLayoutEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { BookOpen, Sparkles } from 'lucide-react';
@@ -133,7 +133,9 @@ function ReviewCardSession({ card }: { card: DomainCard }) {
     [card, submitting],
   );
 
-  useEffect(() => {
+  // useLayoutEffect: слушатель должен быть повешен синхронно с коммитом, иначе
+  // нажатие в зазоре между отрисовкой шага и флашем пассивных эффектов теряется.
+  useLayoutEffect(() => {
     const handler = (e: KeyboardEvent): void => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
