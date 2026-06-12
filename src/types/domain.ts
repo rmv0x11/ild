@@ -57,3 +57,34 @@ export interface DeckStats {
   dueNow: number;
   dueToday: number;
 }
+
+// --- Синонимические колоды ---
+// Отдельный режим в стиле Quizlet: без SM-2, без ReviewLog и без учёта
+// в статистике обучения. Кнопки «Знаю» / «Не знаю», раунды до полного «Знаю».
+
+export type SynonymAnswer = 'know' | 'dont-know';
+
+export interface SynonymDeck {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface SynonymCard {
+  id: string;
+  /** Иероглиф (слово) — сторона 1. */
+  word: string;
+  /** Иероглиф-синоним — сторона 2 (вместо пиньиня и TTS). */
+  synonym: string;
+  /** Объяснение разницы значений — сторона 3. */
+  explanation: string;
+  deckId: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SynonymCsvRow {
+  word: string;
+  synonym: string;
+  explanation: string;
+}

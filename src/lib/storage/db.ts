@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Card, ReviewLog } from '@/types/domain';
+import type { Card, ReviewLog, SynonymCard, SynonymDeck } from '@/types/domain';
 
 export interface MetaRow {
   key: string;
@@ -10,6 +10,8 @@ export class IldDatabase extends Dexie {
   cards!: EntityTable<Card, 'id'>;
   reviews!: EntityTable<ReviewLog, 'id'>;
   meta!: EntityTable<MetaRow, 'key'>;
+  synonymDecks!: EntityTable<SynonymDeck, 'id'>;
+  synonymCards!: EntityTable<SynonymCard, 'id'>;
 
   constructor() {
     super('ild');
@@ -25,6 +27,17 @@ export class IldDatabase extends Dexie {
       cards: 'id, stage, dueAt, [stage+dueAt], word, deckId',
       reviews: '++id, cardId, reviewedAt',
       meta: 'key',
+    });
+    // v3 — synonym decks: отдельный Quizlet-режим, который не смешивается с
+    // SM-2 (cards/reviews/meta не меняются). synonymCards индексируем только по
+    // deckId (выборка карточек колоды; дедупликация при импорте идёт сканом
+    // карточек колоды по паре word+synonym и индекса не требует).
+    this.version(3).stores({
+      cards: 'id, stage, dueAt, [stage+dueAt], word, deckId',
+      reviews: '++id, cardId, reviewedAt',
+      meta: 'key',
+      synonymDecks: 'id',
+      synonymCards: 'id, deckId',
     });
   }
 }

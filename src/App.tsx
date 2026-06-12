@@ -6,6 +6,8 @@ import { PracticePage } from '@/features/practice/PracticePage';
 import { ImportPage } from '@/features/deck/ImportPage';
 import { StatsPage } from '@/features/stats/StatsPage';
 import { CardsListPage } from '@/features/cards/CardsListPage';
+import { SynonymDecksPage } from '@/features/synonyms/SynonymDecksPage';
+import { SynonymStudyPage } from '@/features/synonyms/SynonymStudyPage';
 import { OnboardingDialog } from '@/features/onboarding/OnboardingDialog';
 import {
   isOnboardingCompleted,
@@ -59,6 +61,8 @@ export default function App() {
           <Route index element={<Navigate to="/review" replace />} />
           <Route path="review" element={<ReviewPage />} />
           <Route path="practice" element={<PracticePage />} />
+          <Route path="synonyms" element={<SynonymDecksPage />} />
+          <Route path="synonyms/:deckId" element={<SynonymStudyPage />} />
           <Route path="cards" element={<CardsListPage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="stats" element={<StatsPage />} />

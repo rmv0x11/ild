@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { BarChart3, Brain, Layers, Upload, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, BarChart3, Brain, Layers, Upload, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/AuthContext';
 import { UserBadge } from '@/features/auth/UserBadge';
@@ -8,6 +8,7 @@ import { useSync } from '@/features/sync/useSync';
 
 const navItems: { to: string; label: string; Icon: LucideIcon }[] = [
   { to: '/review', label: 'Повторение', Icon: Brain },
+  { to: '/synonyms', label: 'Синонимы', Icon: ArrowLeftRight },
   { to: '/cards', label: 'Колода', Icon: Layers },
   { to: '/import', label: 'Импорт', Icon: Upload },
   { to: '/stats', label: 'Статистика', Icon: BarChart3 },
@@ -19,14 +20,12 @@ export function Layout() {
   const authenticated = status === 'authenticated';
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
+    <div className="bg-background text-foreground min-h-dvh">
       <header className="border-b">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-4 py-3">
           <NavLink to="/review" aria-label="ild" className="flex items-baseline gap-2">
             <span className="text-xl font-bold tracking-tight">ild</span>
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              китайский с SM-2
-            </span>
+            <span className="text-muted-foreground hidden text-xs sm:inline">китайский с SM-2</span>
           </NavLink>
           <nav className="flex flex-1 items-center justify-center gap-4 text-sm">
             {navItems.map(({ to, label, Icon }) => (
@@ -35,13 +34,13 @@ export function Layout() {
                 to={to}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground',
-                    isActive && 'font-bold text-foreground underline underline-offset-4',
+                    'text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors',
+                    isActive && 'text-foreground font-bold underline underline-offset-4',
                   )
                 }
               >
                 <Icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{label}</span>
+                <span className="hidden md:inline">{label}</span>
               </NavLink>
             ))}
           </nav>
