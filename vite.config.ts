@@ -4,8 +4,14 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 import fs from 'node:fs';
 
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/ild/' : '/',
+export default defineConfig(({ command, mode }) => ({
+  // The Capacitor native build (`vite build --mode capacitor`) serves its assets
+  // from the WebView root (capacitor://localhost / https://localhost), so it must
+  // use base '/', NOT the GitHub Pages subpath '/ild/' (which would 404 every
+  // asset inside the app). That mode also loads `.env.capacitor`, which blanks
+  // VITE_API_URL → the shipped app is fully offline / local-only (hasApi() is
+  // false, AuthContext degrades to guest), satisfying Apple's airplane-mode test.
+  base: command === 'build' && mode !== 'capacitor' ? '/ild/' : '/',
   plugins: [
     react(),
     tailwindcss(),
