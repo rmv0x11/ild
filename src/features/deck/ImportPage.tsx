@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { PresetGallery } from './PresetGallery';
 import { BackupSection } from '@/features/backup/BackupSection';
+import { RemindersSection } from '@/features/reminders/RemindersSection';
 
 interface ParsedState {
   rows: CsvRow[];
@@ -184,6 +185,8 @@ export function ImportPage() {
       </Card>
 
       <BackupSection />
+
+      <RemindersSection />
 
       {parsed && (
         <Card>
