@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { PresetGallery } from './PresetGallery';
+import { BackupSection } from '@/features/backup/BackupSection';
 
 interface ParsedState {
   rows: CsvRow[];
@@ -181,6 +182,8 @@ export function ImportPage() {
           )}
         </CardContent>
       </Card>
+
+      <BackupSection />
 
       {parsed && (
         <Card>

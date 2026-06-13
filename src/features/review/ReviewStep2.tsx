@@ -6,11 +6,13 @@ import {
   getAvailableChineseVoices,
   getSelectedVoiceURI,
   isTtsAvailable,
+  openVoiceInstallSettings,
   setSelectedVoiceURI,
   speakChinese,
   subscribeToVoicesChanged,
   type VoiceInfo,
 } from '@/lib/tts/speak';
+import { isNativePlatform } from '@/lib/platform';
 
 interface ReviewStep2Props {
   word: string;
@@ -134,10 +136,23 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              Китайский голос (zh-*) не найден в системе. Установите китайский язык в
-              настройках ОС.
+              Китайский голос (zh-*) не найден в системе.{' '}
+              {isNativePlatform()
+                ? 'Установите голосовой пакет «Китайский (Mandarin)» в настройках синтеза речи.'
+                : 'Установите китайский язык в настройках ОС.'}
             </span>
           </div>
+          {isNativePlatform() && (
+            <div className="mt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void openVoiceInstallSettings()}
+              >
+                Открыть настройки голоса
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

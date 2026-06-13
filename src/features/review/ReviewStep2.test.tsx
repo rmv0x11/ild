@@ -13,6 +13,7 @@ vi.mock('@/lib/tts/speak', () => ({
   getSelectedVoiceURI: vi.fn(() => null),
   setSelectedVoiceURI: vi.fn(),
   subscribeToVoicesChanged: vi.fn(() => () => {}),
+  openVoiceInstallSettings: vi.fn(() => Promise.resolve()),
 }));
 
 const isTtsAvailableMock = vi.mocked(ttsModule.isTtsAvailable);
