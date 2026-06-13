@@ -1,138 +1,54 @@
-// Dead-simple Web Speech wrapper — the exact shape we shipped in the first
-// iteration of the project (when the user reported it working). Every layer
-// we added on top of this turned out to be a regression vector, so we are
-// keeping it deliberately bare.
+// Public TTS facade. Keeps the exact surface the app shipped with
+// (speakChinese, the voice helpers, VoiceInfo/SpeakResult) so consumers
+// (ReviewStep1/2, ReviewPage, main.tsx, tests) need no changes, while routing
+// to the right provider:
 //
-// The only modern wart is the SpeakResult return type: callers downstream
-// (ReviewStep2 UI, tests) read `spoke` / `errorType` to surface state to the
-// user. Promise<void> would simplify this file further but would force a
-// ripple of edits across every consumer for no real benefit.
+//   - web      → Web Speech API (./web) — unchanged, battle-tested path.
+//   - native   → Capacitor @capacitor-community/text-to-speech (./native) —
+//                AVSpeechSynthesizer / Android TextToSpeech, reliable offline
+//                zh-CN, no WebView gesture limitation.
+//
+// Voice-selection persistence + change notifications live in ./selection and are
+// shared, so the voice picker behaves identically on both.
 
-const VOICE_LS_KEY = 'ild:tts:voiceURI';
+import type { SpeakResult, VoiceInfo } from './types';
+import { isNativeTts } from './platform';
+import {
+  getSelectedVoiceURI,
+  setSelectedVoiceURI,
+  subscribeToVoicesChanged as subscribeSelection,
+} from './selection';
+import * as native from './native';
+import * as web from './web';
 
-let cachedVoices: SpeechSynthesisVoice[] | null = null;
-let voicesListenerAttached = false;
-const voicesChangedListeners = new Set<() => void>();
-
-function notifyVoicesChanged(): void {
-  for (const fn of voicesChangedListeners) {
-    try {
-      fn();
-    } catch {
-      /* ignored */
-    }
-  }
-}
-
-function ensureVoicesListener(): void {
-  if (voicesListenerAttached) return;
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  voicesListenerAttached = true;
-  window.speechSynthesis.addEventListener('voiceschanged', () => {
-    cachedVoices = window.speechSynthesis.getVoices();
-    notifyVoicesChanged();
-  });
-}
+export type { VoiceInfo, SpeakResult };
+export { getSelectedVoiceURI, setSelectedVoiceURI };
 
 export function isTtsAvailable(): boolean {
-  return typeof window !== 'undefined' && 'speechSynthesis' in window;
+  return isNativeTts() ? native.isAvailable() : web.isAvailable();
 }
 
-/** Kept for backwards-compat with main.tsx import. No-op besides voice prefetch. */
+/** Kept for backwards-compat with main.tsx import. Prefetches the voice list. */
 export function warmUpTts(): void {
-  if (!isTtsAvailable()) return;
-  try {
-    ensureVoicesListener();
-    window.speechSynthesis.getVoices();
-  } catch {
-    /* ignored */
-  }
-}
-
-export interface VoiceInfo {
-  name: string;
-  lang: string;
-  local: boolean;
-  voiceURI: string;
-}
-
-function voiceToInfo(v: SpeechSynthesisVoice): VoiceInfo {
-  return {
-    name: v.name || v.lang,
-    lang: v.lang,
-    local: !!v.localService,
-    voiceURI: v.voiceURI,
-  };
-}
-
-function readChineseVoices(): SpeechSynthesisVoice[] {
-  if (!isTtsAvailable()) return [];
-  ensureVoicesListener();
-  if (!cachedVoices || cachedVoices.length === 0) {
-    cachedVoices = window.speechSynthesis.getVoices();
-  }
-  if (!cachedVoices) return [];
-  return cachedVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('zh'));
+  if (isNativeTts()) native.warmUp();
+  else web.warmUp();
 }
 
 export function getAvailableChineseVoices(): VoiceInfo[] {
-  return readChineseVoices()
-    .slice()
-    .sort((a, b) => {
-      const la = !!a.localService;
-      const lb = !!b.localService;
-      if (la !== lb) return la ? -1 : 1;
-      return (a.name || '').localeCompare(b.name || '');
-    })
-    .map(voiceToInfo);
+  return isNativeTts() ? native.getAvailableChineseVoices() : web.getAvailableChineseVoices();
 }
 
-export function getSelectedVoiceURI(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.localStorage.getItem(VOICE_LS_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setSelectedVoiceURI(uri: string | null): void {
-  if (typeof window === 'undefined') return;
-  try {
-    if (uri === null) window.localStorage.removeItem(VOICE_LS_KEY);
-    else window.localStorage.setItem(VOICE_LS_KEY, uri);
-  } catch {
-    /* ignored */
-  }
-  notifyVoicesChanged();
-}
-
-/** Subscribe to voices/selection changes. Returns an unsubscribe fn. */
-export function subscribeToVoicesChanged(listener: () => void): () => void {
-  ensureVoicesListener();
-  voicesChangedListeners.add(listener);
-  return () => {
-    voicesChangedListeners.delete(listener);
-  };
-}
-
+/**
+ * Raw Web Speech voice — only meaningful on the web path (used to pin
+ * `utterance.voice`). Returns null on native, where voices are selected by index
+ * inside the provider. No app code reads this on native; kept for the web tests.
+ */
 export function getChineseVoice(): SpeechSynthesisVoice | null {
-  const chinese = readChineseVoices();
-  if (chinese.length === 0) return null;
-
-  const selectedURI = getSelectedVoiceURI();
-  if (selectedURI) {
-    const found = chinese.find((v) => v.voiceURI === selectedURI);
-    if (found) return found;
-  }
-
-  const zhCN = chinese.find((v) => v.lang.toLowerCase().startsWith('zh-cn'));
-  return zhCN ?? chinese[0];
+  return isNativeTts() ? null : web.getChineseVoice();
 }
 
 export function getChineseVoiceInfo(): VoiceInfo | null {
-  const v = getChineseVoice();
-  return v ? voiceToInfo(v) : null;
+  return isNativeTts() ? native.getChineseVoiceInfo() : web.getChineseVoiceInfo();
 }
 
 export function getChineseVoiceLabel(): string | null {
@@ -141,56 +57,27 @@ export function getChineseVoiceLabel(): string | null {
   return `${info.name} (${info.lang})`;
 }
 
-export function cancelSpeech(): void {
-  if (!isTtsAvailable()) return;
-  try {
-    window.speechSynthesis.cancel();
-  } catch {
-    /* ignored */
-  }
+/** Subscribe to voices/selection changes. Returns an unsubscribe fn. */
+export function subscribeToVoicesChanged(listener: () => void): () => void {
+  // On web, make sure the speechSynthesis `voiceschanged` listener is attached
+  // so async voice-list population also fires the callback.
+  if (!isNativeTts()) web.ensureVoicesListener();
+  return subscribeSelection(listener);
 }
 
-export interface SpeakResult {
-  spoke: boolean;
-  errorType?: string;
-  voice?: VoiceInfo | null;
+export function cancelSpeech(): void {
+  if (isNativeTts()) native.cancel();
+  else web.cancel();
 }
 
 export function speakChinese(text: string): Promise<SpeakResult> {
-  if (!isTtsAvailable()) {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve({ spoke: false, voice: null }), 800);
-    });
-  }
+  return isNativeTts() ? native.speak(text) : web.speak(text);
+}
 
-  ensureVoicesListener();
-
-  return new Promise((resolve) => {
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.rate = 0.9;
-      const voice = getChineseVoice();
-      if (voice) {
-        utterance.voice = voice;
-      }
-      utterance.onend = () => resolve({ spoke: true, voice: getChineseVoiceInfo() });
-      utterance.onerror = (event) => {
-        const ev = event as SpeechSynthesisErrorEvent;
-        resolve({
-          spoke: false,
-          errorType: ev.error ?? 'unknown',
-          voice: getChineseVoiceInfo(),
-        });
-      };
-      window.speechSynthesis.speak(utterance);
-    } catch (err) {
-      resolve({
-        spoke: false,
-        errorType: err instanceof Error ? err.name : 'threw',
-        voice: getChineseVoiceInfo(),
-      });
-    }
-  });
+/**
+ * Android only: open the system TTS settings so the user can install a Mandarin
+ * voice pack. No-op on web/iOS. Wire into the "no Chinese voice" UI on native.
+ */
+export function openVoiceInstallSettings(): Promise<void> {
+  return isNativeTts() ? native.openVoiceInstall() : Promise.resolve();
 }
