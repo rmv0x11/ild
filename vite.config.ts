@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -15,6 +16,48 @@ export default defineConfig(({ command, mode }) => ({
   plugins: [
     react(),
     tailwindcss(),
+    // Installable PWA + offline service worker. Disabled for the Capacitor
+    // build (native shell bundles assets locally and WKWebView has no usable
+    // service worker) and for the test run.
+    VitePWA({
+      disable: mode === 'capacitor' || mode === 'test',
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      includeAssets: ['favicon.svg', 'favicon-32.png', 'apple-touch-icon.png'],
+      manifest: {
+        name: 'ild · китайский по карточкам',
+        short_name: 'ild',
+        description:
+          'Интервальные повторения китайских иероглифов: иероглиф → пиньинь с озвучкой → перевод.',
+        lang: 'ru',
+        theme_color: '#0a0a0a',
+        background_color: '#0a0a0a',
+        display: 'standalone',
+        orientation: 'portrait',
+        categories: ['education'],
+        icons: [
+          { src: 'icons/pwa-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'icons/pwa-512.png', sizes: '512x512', type: 'image/png' },
+          {
+            src: 'icons/pwa-maskable-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+          {
+            src: 'icons/pwa-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'],
+        navigateFallback: 'index.html',
+        cleanupOutdatedCaches: true,
+      },
+    }),
     {
       name: 'spa-404-fallback',
       apply: 'build',
