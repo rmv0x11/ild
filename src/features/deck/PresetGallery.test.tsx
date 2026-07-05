@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PRESETS } from '@/lib/presets';
+import { PRESETS, getPresetsForLanguage } from '@/lib/presets';
 import * as presetsModule from '@/lib/presets';
 import * as cardsModule from '@/lib/storage/cards';
 import { PresetGallery } from './PresetGallery';
@@ -24,24 +24,22 @@ describe('PresetGallery', () => {
     expect(screen.getByText('Тематические наборы')).toBeInTheDocument();
   });
 
-  it('renders every registered preset by name', () => {
+  it('renders every preset for the active language (zh) by name', () => {
     render(<PresetGallery />);
-    for (const p of PRESETS) {
+    // The gallery is scoped to the active language, which defaults to Chinese,
+    // so only zh presets are rendered (Korean ones stay hidden).
+    for (const p of getPresetsForLanguage('zh')) {
       expect(screen.getByText(p.name)).toBeInTheDocument();
     }
   });
 
   it('clicking "Загрузить" on a preset calls loadPresetCsv + addCards', async () => {
     const user = userEvent.setup();
-    const loadSpy = vi
-      .spyOn(presetsModule, 'loadPresetCsv')
-      .mockResolvedValue({
-        rows: [{ word: '你好', pinyin: 'nǐ hǎo', context: '**你好** → Привет.' }],
-        errors: [],
-      });
-    const addSpy = vi
-      .spyOn(cardsModule, 'addCards')
-      .mockResolvedValue({ added: 1, skipped: 0 });
+    const loadSpy = vi.spyOn(presetsModule, 'loadPresetCsv').mockResolvedValue({
+      rows: [{ word: '你好', pinyin: 'nǐ hǎo', context: '**你好** → Привет.' }],
+      errors: [],
+    });
+    const addSpy = vi.spyOn(cardsModule, 'addCards').mockResolvedValue({ added: 1, skipped: 0 });
 
     render(<PresetGallery />);
     const hskItem = screen.getByText(PRESETS[0].name).closest('li');

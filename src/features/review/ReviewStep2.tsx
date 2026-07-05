@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Volume2, AlertCircle } from 'lucide-react';
+import type { Language } from '@/types/domain';
 import { Button } from '@/components/ui/button';
+import { getLanguageMeta } from '@/lib/lang/language';
 import {
   cancelSpeech,
-  getAvailableChineseVoices,
+  getAvailableVoices,
   getSelectedVoiceURI,
   isTtsAvailable,
   openVoiceInstallSettings,
   setSelectedVoiceURI,
-  speakChinese,
+  speak,
   subscribeToVoicesChanged,
   type VoiceInfo,
 } from '@/lib/tts/speak';
@@ -16,37 +18,39 @@ import { isNativePlatform } from '@/lib/platform';
 
 interface ReviewStep2Props {
   word: string;
-  pinyin: string;
+  reading: string;
+  lang: Language;
   onNext: () => void;
 }
 
 const MIN_DELAY_MS = 800;
 
-export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
+export function ReviewStep2({ word, reading, lang, onNext }: ReviewStep2Props) {
+  const meta = getLanguageMeta(lang);
   const ttsAvailable = isTtsAvailable();
   const [ttsFinished, setTtsFinished] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [lastErrorType, setLastErrorType] = useState<string | null>(null);
   const [voices, setVoices] = useState<VoiceInfo[]>(() =>
-    ttsAvailable ? getAvailableChineseVoices() : [],
+    ttsAvailable ? getAvailableVoices(lang) : [],
   );
   const [selectedURI, setSelectedURI] = useState<string | null>(() =>
-    ttsAvailable ? getSelectedVoiceURI() : null,
+    ttsAvailable ? getSelectedVoiceURI(lang) : null,
   );
   const minTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!ttsAvailable) return;
     return subscribeToVoicesChanged(() => {
-      setVoices(getAvailableChineseVoices());
-      setSelectedURI(getSelectedVoiceURI());
+      setVoices(getAvailableVoices(lang));
+      setSelectedURI(getSelectedVoiceURI(lang));
     });
-  }, [ttsAvailable]);
+  }, [ttsAvailable, lang]);
 
   const playTts = (): void => {
     setIsSpeaking(true);
     setLastErrorType(null);
-    speakChinese(word)
+    speak(word, lang)
       .then((res) => {
         if (res.errorType) setLastErrorType(res.errorType);
       })
@@ -56,11 +60,11 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
   };
 
   const handleVoiceChange = (uri: string): void => {
-    setSelectedVoiceURI(uri || null);
+    setSelectedVoiceURI(lang, uri || null);
   };
 
   useEffect(() => {
-    // We deliberately do NOT call speakChinese() here. The initial playback is
+    // We deliberately do NOT call speak() here. The initial playback is
     // started inside ReviewStep1.onClick (which keeps the browser's
     // user-activation token alive — critical for Chrome's autoplay rules).
     // Doing speak() both there and here used to cancel the first call, which
@@ -81,12 +85,12 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
   }, []);
 
   const canAdvance = ttsFinished;
-  const noChineseVoice = ttsAvailable && voices.length === 0;
+  const noVoice = ttsAvailable && voices.length === 0;
 
   return (
     <div className="flex flex-col items-center gap-6 py-12">
       <div className="text-center text-7xl font-semibold tracking-tight">{word}</div>
-      <div className="text-center text-2xl text-muted-foreground">{pinyin}</div>
+      <div className="text-muted-foreground text-center text-2xl">{reading}</div>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Button
           variant="outline"
@@ -104,11 +108,11 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
       </div>
 
       {ttsAvailable && voices.length > 0 && (
-        <label className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <label className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
           <span>Голос:</span>
           <select
             aria-label="Выбор голоса"
-            className="rounded border bg-background px-2 py-1 text-xs"
+            className="bg-background rounded border px-2 py-1 text-xs"
             value={selectedURI ?? ''}
             onChange={(e) => handleVoiceChange(e.target.value)}
           >
@@ -123,12 +127,12 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
       )}
 
       {!ttsAvailable && (
-        <div className="text-center text-xs text-muted-foreground">
+        <div className="text-muted-foreground text-center text-xs">
           Озвучка недоступна в этом браузере.
         </div>
       )}
 
-      {noChineseVoice && (
+      {noVoice && (
         <div
           className="max-w-md rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100"
           role="status"
@@ -136,19 +140,15 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              Китайский голос (zh-*) не найден в системе.{' '}
+              {meta.name} голос ({meta.voicePrefix}-*) не найден в системе.{' '}
               {isNativePlatform()
-                ? 'Установите голосовой пакет «Китайский (Mandarin)» в настройках синтеза речи.'
-                : 'Установите китайский язык в настройках ОС.'}
+                ? `Установите голосовой пакет «${meta.voiceName}» в настройках синтеза речи.`
+                : `Установите ${meta.name.toLowerCase()} язык в настройках ОС.`}
             </span>
           </div>
           {isNativePlatform() && (
             <div className="mt-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void openVoiceInstallSettings()}
-              >
+              <Button size="sm" variant="outline" onClick={() => void openVoiceInstallSettings()}>
                 Открыть настройки голоса
               </Button>
             </div>
@@ -164,8 +164,8 @@ export function ReviewStep2({ word, pinyin, onNext }: ReviewStep2Props) {
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              Озвучка не удалась: <code>{lastErrorType}</code>. Проверьте громкость
-              системы или выберите другой голос.
+              Озвучка не удалась: <code>{lastErrorType}</code>. Проверьте громкость системы или
+              выберите другой голос.
             </span>
           </div>
         </div>

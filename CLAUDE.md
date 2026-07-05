@@ -2,7 +2,9 @@
 
 ## Project
 
-Anki-подобный веб-сервис для изучения китайского. Карточка показывается в три обязательных шага: иероглиф → пиньинь с автоматическим TTS → перевод с контекстом. Интервалы повторений — алгоритм SM-2 с 4 кнопками оценки (Again / Hard / Good / Easy). Всё хранится локально в IndexedDB, без бэкенда и регистрации. TTS — Web Speech API.
+Anki-подобный веб-сервис для изучения языков — **китайского (HSK) и корейского (TOPIK)**. Карточка показывается в три обязательных шага: слово → чтение (пиньинь для zh / романизация-romaja для ko) с автоматическим TTS → перевод с контекстом. Интервалы повторений — алгоритм SM-2 с 4 кнопками оценки (Again / Hard / Good / Easy). Всё хранится локально в IndexedDB, без бэкенда и регистрации. TTS — Web Speech API.
+
+Язык — глобальный переключатель в шапке (🇨🇳/🇰🇷). Всё (очередь повторения, колоды, статистика, импорт, галерея пресетов) скоупится по активному языку; у каждой карточки есть поле `lang`. Регистр языков и все language-specific строки/локали — в `src/lib/lang/language.ts` (`LANGUAGE_META`); поле `pinyin` в `Card` хранит чтение для обоих языков (имя сохранено ради back-compat, в UI подписывается через `readingLabel`).
 
 ## Stack
 
@@ -22,11 +24,11 @@ Anki-подобный веб-сервис для изучения китайск
 
 **Запуск приложения — только в Docker.** Не используй `npm run dev`/`npm run preview`/`npm run build` локально для запуска приложения.
 
-| | |
-|-|-|
-| `docker compose up --build dev` | dev-сервер на 5173 |
+|                                  |                    |
+| -------------------------------- | ------------------ |
+| `docker compose up --build dev`  | dev-сервер на 5173 |
 | `docker compose up --build prod` | nginx-prod на 8080 |
-| `docker compose down` | стоп |
+| `docker compose down`            | стоп               |
 
 - `docker compose up --build dev` — Vite dev-сервер (заменяет локальный `npm run dev`)
 - `npm run build` — `tsc -b && vite build` (используется внутри Docker-сборки)
@@ -44,10 +46,13 @@ Anki-подобный веб-сервис для изучения китайск
 - `src/features/review/` — экран повторения карточек (3-шаговый flow, кнопки оценки)
 - `src/features/deck/` — управление колодами, импорт CSV
 - `src/features/stats/` — статистика (due / young / mature)
+- `src/features/lang/` — переключатель языка + хук `useActiveLanguage`
+- `src/lib/lang/` — регистр языков (`language.ts`, `LANGUAGE_META`) + стор активного языка (`activeLanguage.ts`, localStorage)
 - `src/lib/sm2/` — чистое SM-2 ядро (без I/O, без Date.now внутри функций)
 - `src/lib/csv/` — обёртки над papaparse (parse/serialize)
 - `src/lib/storage/` — Dexie + репозитории
-- `src/lib/tts/` — Web Speech API wrapper
+- `src/lib/tts/` — TTS-фасад (Web Speech + Capacitor native), параметризован языком: `speak(text, lang)`
+- `src/lib/presets/` — готовые наборы (HSK zh + TOPIK/тематические ko); CSV в `public/decks/` (корейские — под `public/decks/ko/`)
 - `src/types/` — доменные типы (`Card`, `Review`, `Deck`, …)
 - `src/test/` — setup-файлы для Vitest
 
@@ -73,6 +78,7 @@ Anki-подобный веб-сервис для изучения китайск
 ## Стиль работы
 
 **По умолчанию — fanout subagents.** Для любой задачи, которую можно разбить на независимые блоки (несколько файлов, не пересекающиеся скоупы, параллельные ветви), сразу спавнить параллельных subagents через Agent tool (`run_in_background: true`), а не выполнять последовательно в основном цикле. Подходит:
+
 - Внедрение фич, состоящих из нескольких слоёв (UI + storage + tests).
 - Покрытие тестами нескольких папок.
 - Документация + код + конфиг.

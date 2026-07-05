@@ -12,6 +12,7 @@ import {
 function makeCard(id: string, word: string, overrides: Partial<Card> = {}): Card {
   return {
     id,
+    lang: 'zh',
     word,
     pinyin: 'pīn',
     context: 'context',
@@ -139,6 +140,26 @@ describe('storage/backup', () => {
     expect(cards.map((c) => c.id).sort()).toEqual(['c1', 'c2']); // leftover gone
     expect(await db.reviews.count()).toBe(2);
     expect(await db.synonymCards.count()).toBe(1);
+  });
+
+  it('restore backfills lang on cards from a pre-multi-language backup', async () => {
+    // A legacy backup (version 1) whose card object has no `lang` field.
+    const { lang: _drop, ...langless } = makeCard('legacy', '旧');
+    const backup: Parameters<typeof restoreBackup>[0] = {
+      app: 'ild',
+      kind: 'backup',
+      version: 1,
+      exportedAt: 1,
+      counts: { cards: 1, reviews: 0, synonymDecks: 0, synonymCards: 0 },
+      data: {
+        cards: [langless as Card],
+        reviews: [],
+        synonymDecks: [],
+        synonymCards: [],
+      },
+    };
+    await restoreBackup(backup, 'replace');
+    expect((await db.cards.get('legacy'))?.lang).toBe('zh');
   });
 
   it('restore merge upserts cards by id and appends reviews', async () => {

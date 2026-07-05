@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { BookOpen, Sparkles, X } from 'lucide-react';
 import type { Card as DomainCard } from '@/types/domain';
 import { getAllCards } from '@/lib/storage/cards';
+import { normalizeLanguage } from '@/lib/lang/language';
 import { Card, CardContent } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -11,6 +12,7 @@ import { ReviewStep1 } from '@/features/review/ReviewStep1';
 import { ReviewStep2 } from '@/features/review/ReviewStep2';
 import { DeckSelector } from '@/features/deck/DeckSelector';
 import { useDeckFilter } from '@/features/deck/useDeckFilter';
+import { useActiveLanguage } from '@/features/lang/useActiveLanguage';
 import { DECK_ALL } from '@/lib/storage/deckFilter';
 import { cn } from '@/lib/utils';
 import { PracticeStep3 } from './PracticeStep3';
@@ -31,16 +33,17 @@ function shuffle<T>(items: readonly T[]): T[] {
 
 export function PracticePage() {
   const [filter] = useDeckFilter();
+  const [lang] = useActiveLanguage();
   const allCards = useLiveQuery<DomainCard[] | undefined>(
-    () => getAllCards(filter),
-    [filter],
+    () => getAllCards(lang, filter),
+    [filter, lang],
   );
 
   if (allCards === undefined) {
     return (
       <div className="flex animate-pulse flex-col gap-4">
-        <div className="h-2 w-full rounded bg-muted" />
-        <div className="h-72 rounded-lg bg-muted" />
+        <div className="bg-muted h-2 w-full rounded" />
+        <div className="bg-muted h-72 rounded-lg" />
       </div>
     );
   }
@@ -52,13 +55,13 @@ export function PracticePage() {
         <DeckSelector />
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-16">
-            <div className="rounded-full bg-muted p-6">
-              <BookOpen className="h-12 w-12 text-muted-foreground" />
+            <div className="bg-muted rounded-full p-6">
+              <BookOpen className="text-muted-foreground h-12 w-12" />
             </div>
             <div className="text-lg font-medium">
               {filtered ? 'В выбранной колоде нет карточек' : 'Сначала загрузите карты'}
             </div>
-            <p className="max-w-sm text-center text-sm text-muted-foreground">
+            <p className="text-muted-foreground max-w-sm text-center text-sm">
               {filtered
                 ? 'Переключите фильтр на «Все колоды» или загрузите CSV/готовый набор.'
                 : 'В колоде пока пусто. Загрузите CSV-колоду, чтобы начать тренировку.'}
@@ -149,7 +152,7 @@ function PracticeSession({ cards }: { cards: DomainCard[] }) {
     <div className="flex flex-col gap-4">
       <PracticeHeader index={index + 1} total={total} />
 
-      <div className="mb-1 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+      <div className="text-muted-foreground mb-1 flex items-center justify-center gap-2 text-sm">
         <span aria-label={`Шаг ${step} из 3`}>Шаг {step} / 3</span>
         <div className="flex gap-1">
           {[1, 2, 3].map((i) => (
@@ -167,19 +170,26 @@ function PracticeSession({ cards }: { cards: DomainCard[] }) {
       <Card>
         <CardContent className="pt-6">
           <div key={`${current.id}-${step}`} className="animate-in fade-in duration-300">
-            {step === 1 && <ReviewStep1 word={current.word} onNext={() => setStep(2)} />}
+            {step === 1 && (
+              <ReviewStep1
+                word={current.word}
+                lang={normalizeLanguage(current.lang)}
+                onNext={() => setStep(2)}
+              />
+            )}
             {step === 2 && (
               <ReviewStep2
                 key={current.id}
                 word={current.word}
-                pinyin={current.pinyin}
+                reading={current.pinyin}
+                lang={normalizeLanguage(current.lang)}
                 onNext={() => setStep(3)}
               />
             )}
             {step === 3 && (
               <PracticeStep3
                 word={current.word}
-                pinyin={current.pinyin}
+                reading={current.pinyin}
                 context={current.context}
                 onNext={advance}
               />
@@ -188,8 +198,8 @@ function PracticeSession({ cards }: { cards: DomainCard[] }) {
         </CardContent>
       </Card>
 
-      <div className="mt-1 text-center text-xs text-muted-foreground">
-        Подсказка: <kbd className="rounded border bg-muted px-1.5 py-0.5">Space</kbd> — далее
+      <div className="text-muted-foreground mt-1 text-center text-xs">
+        Подсказка: <kbd className="bg-muted rounded border px-1.5 py-0.5">Space</kbd> — далее
       </div>
     </div>
   );
@@ -200,7 +210,7 @@ function PracticeHeader({ index, total }: { index: number; total: number }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-sm text-muted-foreground">
+        <div className="text-muted-foreground text-sm">
           {index} / {total}
         </div>
         <Link

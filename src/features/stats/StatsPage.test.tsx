@@ -79,6 +79,7 @@ describe('StatsPage', () => {
   it('reports a mature card in the mature tile and progress %', async () => {
     const matureCard: Card = {
       id: 'mature-1',
+      lang: 'zh',
       word: '老',
       pinyin: 'lǎo',
       context: 'c',

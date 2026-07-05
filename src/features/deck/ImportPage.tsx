@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import type { CsvRow } from '@/types/domain';
 import { parseDeckCsv, SAMPLE_CSV } from '@/lib/csv/parser';
 import { addCards, clearAll } from '@/lib/storage/cards';
+import { getLanguageMeta } from '@/lib/lang/language';
+import { useActiveLanguage } from '@/features/lang/useActiveLanguage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,6 +27,8 @@ interface ImportResult {
 }
 
 export function ImportPage() {
+  const [lang] = useActiveLanguage();
+  const meta = getLanguageMeta(lang);
   const [parsed, setParsed] = useState<ParsedState | null>(null);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -80,7 +84,7 @@ export function ImportPage() {
     if (!parsed || parsed.rows.length === 0) return;
     setImporting(true);
     try {
-      const res = await addCards(parsed.rows, Date.now());
+      const res = await addCards(parsed.rows, Date.now(), { lang });
       setResult(res);
       setParsed(null);
       if (inputRef.current) inputRef.current.value = '';
@@ -108,12 +112,13 @@ export function ImportPage() {
   };
 
   const handleClear = async (): Promise<void> => {
-    if (!window.confirm('Удалить все карточки? Это действие необратимо.')) return;
+    if (!window.confirm(`Удалить все карточки языка «${meta.name}»? Это действие необратимо.`))
+      return;
     try {
-      await clearAll();
+      await clearAll(lang);
       setResult(null);
       setParsed(null);
-      toast.success('Колода очищена');
+      toast.success(`Колода «${meta.name}» очищена`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Не удалось очистить колоду';
       setError(message);
@@ -137,12 +142,12 @@ export function ImportPage() {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             className={cn(
-              'flex flex-col items-center gap-2 rounded-md border-2 border-dashed border-input p-6 text-center transition-colors',
+              'border-input flex flex-col items-center gap-2 rounded-md border-2 border-dashed p-6 text-center transition-colors',
               dragActive && 'border-primary bg-accent',
             )}
           >
             <Upload className="text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Перетащите CSV-файл сюда или выберите вручную.
             </p>
             <Label htmlFor="csv-input" className="sr-only">
@@ -165,18 +170,18 @@ export function ImportPage() {
             </Button>
             <Button variant="destructive" onClick={handleClear}>
               <Trash2 />
-              Очистить колоду
+              Очистить «{meta.name}»
             </Button>
           </div>
 
           {error && (
-            <div className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <div className="border-destructive bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
               {error}
             </div>
           )}
 
           {result && (
-            <div className="rounded-md border bg-muted px-3 py-2 text-sm">
+            <div className="bg-muted rounded-md border px-3 py-2 text-sm">
               Добавлено: <strong>{result.added}</strong> · пропущено{' '}
               <strong>{result.skipped}</strong>
             </div>
@@ -193,7 +198,7 @@ export function ImportPage() {
           <CardHeader>
             <CardTitle>
               Превью: {parsed.fileName}{' '}
-              <span className="text-sm font-normal text-muted-foreground">
+              <span className="text-muted-foreground text-sm font-normal">
                 ({parsed.rows.length} строк, {parsed.errors.length} ошибок)
               </span>
             </CardTitle>
@@ -203,9 +208,9 @@ export function ImportPage() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="border-b text-left text-muted-foreground">
+                    <tr className="text-muted-foreground border-b text-left">
                       <th className="px-2 py-1 font-medium">Слово</th>
-                      <th className="px-2 py-1 font-medium">Пиньинь</th>
+                      <th className="px-2 py-1 font-medium">{meta.readingLabel}</th>
                       <th className="px-2 py-1 font-medium">Контекст</th>
                     </tr>
                   </thead>
@@ -213,9 +218,7 @@ export function ImportPage() {
                     {previewRows.map((row, i) => (
                       <tr key={i} className="border-b last:border-0">
                         <td className="px-2 py-1 align-top font-medium">{row.word}</td>
-                        <td className="px-2 py-1 align-top text-muted-foreground">
-                          {row.pinyin}
-                        </td>
+                        <td className="text-muted-foreground px-2 py-1 align-top">{row.pinyin}</td>
                         <td className="px-2 py-1 align-top">{row.context}</td>
                       </tr>
                     ))}
@@ -223,30 +226,25 @@ export function ImportPage() {
                 </table>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Не нашли валидных строк.</p>
+              <p className="text-muted-foreground text-sm">Не нашли валидных строк.</p>
             )}
 
             {parsed.errors.length > 0 && (
-              <div className="rounded-md border bg-muted px-3 py-2 text-sm">
+              <div className="bg-muted rounded-md border px-3 py-2 text-sm">
                 <div className="mb-1 font-medium">Ошибки:</div>
-                <ul className="list-inside list-disc space-y-0.5 text-muted-foreground">
+                <ul className="text-muted-foreground list-inside list-disc space-y-0.5">
                   {parsed.errors.slice(0, 10).map((e, i) => (
                     <li key={i}>
                       Строка {e.line}: {e.message}
                     </li>
                   ))}
-                  {parsed.errors.length > 10 && (
-                    <li>…и ещё {parsed.errors.length - 10}</li>
-                  )}
+                  {parsed.errors.length > 10 && <li>…и ещё {parsed.errors.length - 10}</li>}
                 </ul>
               </div>
             )}
 
             <div>
-              <Button
-                onClick={handleImport}
-                disabled={importing || parsed.rows.length === 0}
-              >
+              <Button onClick={handleImport} disabled={importing || parsed.rows.length === 0}>
                 {importing ? 'Импорт…' : 'Импортировать'}
               </Button>
             </div>

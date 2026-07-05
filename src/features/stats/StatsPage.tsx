@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { resetOnboarding } from '@/features/onboarding/onboardingState';
 import { DeckSelector } from '@/features/deck/DeckSelector';
 import { useDeckFilter } from '@/features/deck/useDeckFilter';
+import { useActiveLanguage } from '@/features/lang/useActiveLanguage';
 import { AchievementsSection } from './AchievementsSection';
 
 interface Tile {
@@ -18,12 +19,13 @@ interface Tile {
 
 export function StatsPage() {
   const [filter] = useDeckFilter();
-  const stats = useLiveQuery(() => getStats(Date.now(), filter), [filter]);
+  const [lang] = useActiveLanguage();
+  const stats = useLiveQuery(() => getStats(Date.now(), lang, filter), [filter, lang]);
   const streak = useLiveQuery(() => getStreak(Date.now()), []);
   const navigate = useNavigate();
 
   if (!stats) {
-    return <div className="py-10 text-center text-muted-foreground">Загрузка…</div>;
+    return <div className="text-muted-foreground py-10 text-center">Загрузка…</div>;
   }
 
   const tiles: Tile[] = [
@@ -58,15 +60,13 @@ export function StatsPage() {
           <div className="flex items-center gap-3">
             <Flame className="h-8 w-8 text-amber-500" />
             <div>
-              <div className="text-3xl font-semibold leading-none">
-                {streak?.current ?? 0}
-              </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-3xl leading-none font-semibold">{streak?.current ?? 0}</div>
+              <div className="text-muted-foreground text-xs">
                 {streak?.current === 1 ? 'день подряд' : 'дней подряд'}
               </div>
             </div>
           </div>
-          <div className="text-sm text-muted-foreground">
+          <div className="text-muted-foreground text-sm">
             Лучшая серия: <strong>{streak?.longest ?? 0}</strong>
           </div>
         </CardContent>
@@ -91,7 +91,7 @@ export function StatsPage() {
         {tiles.map((tile) => (
           <Card key={tile.label}>
             <CardContent className="flex flex-col gap-1 p-4">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              <div className="text-muted-foreground text-xs tracking-wide uppercase">
                 {tile.label}
               </div>
               <div className="text-3xl font-semibold">{tile.value}</div>
@@ -107,9 +107,7 @@ export function StatsPage() {
           <CardTitle>Обучение</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">
-            Хотите освежить вводный обзор сервиса?
-          </p>
+          <p className="text-muted-foreground text-sm">Хотите освежить вводный обзор сервиса?</p>
           <div>
             <Button variant="outline" onClick={handleReplayOnboarding}>
               Показать обучение ещё раз

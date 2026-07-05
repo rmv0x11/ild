@@ -39,6 +39,26 @@ export class IldDatabase extends Dexie {
       synonymDecks: 'id',
       synonymCards: 'id, deckId',
     });
+    // v4 — multi-language: each card carries a `lang` ('zh' | 'ko'). Compound
+    // [lang+stage] / [lang+dueAt] indexes let the review queue and stats be
+    // scoped to the active language without scanning the whole table. Existing
+    // cards are backfilled to 'zh' (the app was Chinese-only before this).
+    this.version(4)
+      .stores({
+        cards: 'id, stage, dueAt, [stage+dueAt], word, deckId, lang, [lang+stage], [lang+dueAt]',
+        reviews: '++id, cardId, reviewedAt',
+        meta: 'key',
+        synonymDecks: 'id',
+        synonymCards: 'id, deckId',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('cards')
+          .toCollection()
+          .modify((card: { lang?: string }) => {
+            if (card.lang === undefined) card.lang = 'zh';
+          });
+      });
   }
 }
 

@@ -19,7 +19,7 @@ describe('ImportPage', () => {
     render(<ImportPage />);
     expect(screen.getByText('Импорт колоды CSV')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Скачать пример CSV/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Очистить колоду/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Очистить «Китайский»/ })).toBeInTheDocument();
   });
 
   it('previews uploaded CSV rows and imports them into the deck', async () => {
@@ -54,6 +54,7 @@ describe('ImportPage', () => {
     // pre-seed a card directly
     await db.cards.put({
       id: 'pre-1',
+      lang: 'zh',
       word: 'pre',
       pinyin: 'pre',
       context: 'pre',
@@ -72,7 +73,7 @@ describe('ImportPage', () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<ImportPage />);
 
-    await user.click(screen.getByRole('button', { name: /Очистить колоду/ }));
+    await user.click(screen.getByRole('button', { name: /Очистить «Китайский»/ }));
 
     await waitFor(async () => {
       expect(await db.cards.count()).toBe(0);
@@ -101,6 +102,7 @@ describe('ImportPage', () => {
 
     await db.cards.put({
       id: 'keep-1',
+      lang: 'zh',
       word: 'keep',
       pinyin: 'keep',
       context: 'keep',
@@ -118,7 +120,7 @@ describe('ImportPage', () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<ImportPage />);
 
-    await user.click(screen.getByRole('button', { name: /Очистить колоду/ }));
+    await user.click(screen.getByRole('button', { name: /Очистить «Китайский»/ }));
 
     expect(await db.cards.count()).toBe(1);
     confirmSpy.mockRestore();
@@ -126,9 +128,7 @@ describe('ImportPage', () => {
 
   it('shows an error if addCards throws during import', async () => {
     const user = userEvent.setup();
-    const spy = vi
-      .spyOn(cardsRepo, 'addCards')
-      .mockRejectedValueOnce(new Error('boom-import'));
+    const spy = vi.spyOn(cardsRepo, 'addCards').mockRejectedValueOnce(new Error('boom-import'));
 
     render(<ImportPage />);
     const csv = 'word,pinyin,context\n你好,nǐ hǎo,a\n';
@@ -144,12 +144,10 @@ describe('ImportPage', () => {
   it('shows an error if clearAll throws after confirming', async () => {
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const clearSpy = vi
-      .spyOn(cardsRepo, 'clearAll')
-      .mockRejectedValueOnce(new Error('boom-clear'));
+    const clearSpy = vi.spyOn(cardsRepo, 'clearAll').mockRejectedValueOnce(new Error('boom-clear'));
 
     render(<ImportPage />);
-    await user.click(screen.getByRole('button', { name: /Очистить колоду/ }));
+    await user.click(screen.getByRole('button', { name: /Очистить «Китайский»/ }));
 
     await screen.findByText(/boom-clear/);
 

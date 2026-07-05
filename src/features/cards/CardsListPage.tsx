@@ -5,6 +5,8 @@ import { Clock, Layers, Pencil, RotateCcw, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Card as DomainCard, CardStage } from '@/types/domain';
 import { getAllCards } from '@/lib/storage/cards';
+import { getLanguageMeta } from '@/lib/lang/language';
+import { useActiveLanguage } from '@/features/lang/useActiveLanguage';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -77,7 +79,9 @@ function truncate(s: string, n: number): string {
 }
 
 export function CardsListPage() {
-  const cards = useLiveQuery(() => getAllCards(), []);
+  const [lang] = useActiveLanguage();
+  const meta = getLanguageMeta(lang);
+  const cards = useLiveQuery(() => getAllCards(lang), [lang]);
 
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<Set<CardStage>>(new Set());
@@ -112,7 +116,7 @@ export function CardsListPage() {
     arr.sort((a, b) => {
       let cmp: number;
       if (sortKey === 'word') {
-        cmp = a.word.localeCompare(b.word, 'zh-Hans');
+        cmp = a.word.localeCompare(b.word, meta.collation);
       } else if (sortKey === 'stage') {
         cmp = STAGE_PRIORITY[a.stage] - STAGE_PRIORITY[b.stage];
         if (cmp === 0) cmp = a.dueAt - b.dueAt;
@@ -122,7 +126,7 @@ export function CardsListPage() {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return arr;
-  }, [filtered, sortKey, sortDir]);
+  }, [filtered, sortKey, sortDir, meta.collation]);
 
   const handleToggleStage = (stage: CardStage): void => {
     setStageFilter((prev) => {
@@ -148,11 +152,7 @@ export function CardsListPage() {
   };
 
   const handleReset = async (card: DomainCard): Promise<void> => {
-    if (
-      !window.confirm(
-        `Сбросить прогресс карточки «${card.word}»? Она снова станет новой.`,
-      )
-    ) {
+    if (!window.confirm(`Сбросить прогресс карточки «${card.word}»? Она снова станет новой.`)) {
       return;
     }
     try {
@@ -165,11 +165,7 @@ export function CardsListPage() {
   };
 
   const handleDelete = async (card: DomainCard): Promise<void> => {
-    if (
-      !window.confirm(
-        `Удалить карточку «${card.word}»? Будет также удалена история оценок.`,
-      )
-    ) {
+    if (!window.confirm(`Удалить карточку «${card.word}»? Будет также удалена история оценок.`)) {
       return;
     }
     try {
@@ -189,7 +185,7 @@ export function CardsListPage() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-bold tracking-tight">Все карточки</h1>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-muted-foreground text-sm">
           {total} {plural(total, ['карточка', 'карточки', 'карточек'])}
         </span>
       </div>
@@ -199,7 +195,7 @@ export function CardsListPage() {
           <CardContent className="flex flex-col gap-3 p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Input
-                placeholder="Поиск по слову или пиньиню…"
+                placeholder={meta.searchHint}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 aria-label="Поиск"
@@ -222,7 +218,7 @@ export function CardsListPage() {
                     onClick={() => handleToggleStage(opt.value)}
                     aria-pressed={active}
                     className={cn(
-                      'inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      'focus-visible:ring-ring inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
                       active
                         ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
@@ -240,23 +236,20 @@ export function CardsListPage() {
       {isEmpty ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-16">
-            <div className="rounded-full bg-muted p-6">
-              <Layers className="h-12 w-12 text-muted-foreground" />
+            <div className="bg-muted rounded-full p-6">
+              <Layers className="text-muted-foreground h-12 w-12" />
             </div>
             <div className="text-lg font-medium">Колода пуста — загрузите CSV</div>
-            <Link
-              to="/import"
-              className={buttonVariants({ variant: 'default', size: 'lg' })}
-            >
+            <Link to="/import" className={buttonVariants({ variant: 'default', size: 'lg' })}>
               Загрузить колоду
             </Link>
           </CardContent>
         </Card>
       ) : cards === undefined ? (
-        <div className="py-10 text-center text-muted-foreground">Загрузка…</div>
+        <div className="text-muted-foreground py-10 text-center">Загрузка…</div>
       ) : sorted.length === 0 ? (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          <CardContent className="text-muted-foreground py-10 text-center text-sm">
             Ничего не найдено по текущим фильтрам.
           </CardContent>
         </Card>
@@ -266,15 +259,15 @@ export function CardsListPage() {
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="border-b text-left text-muted-foreground">
+                  <tr className="text-muted-foreground border-b text-left">
                     <SortableTh
-                      label="Иероглиф"
+                      label={meta.wordLabel}
                       sortKey="word"
                       currentSort={sortKey}
                       sortDir={sortDir}
                       onSort={handleSort}
                     />
-                    <th className="px-3 py-2 font-medium">Пиньинь</th>
+                    <th className="px-3 py-2 font-medium">{meta.readingLabel}</th>
                     <th className="hidden px-3 py-2 font-medium md:table-cell">Контекст</th>
                     <SortableTh
                       label="Стадия"
@@ -302,16 +295,12 @@ export function CardsListPage() {
                     return (
                       <tr
                         key={card.id}
-                        className="border-b last:border-0 hover:bg-muted/40"
+                        className="hover:bg-muted/40 border-b last:border-0"
                         data-testid={`card-row-${card.id}`}
                       >
-                        <td className="px-3 py-2 align-top text-base font-medium">
-                          {card.word}
-                        </td>
-                        <td className="px-3 py-2 align-top text-muted-foreground">
-                          {card.pinyin}
-                        </td>
-                        <td className="hidden px-3 py-2 align-top text-muted-foreground md:table-cell">
+                        <td className="px-3 py-2 align-top text-base font-medium">{card.word}</td>
+                        <td className="text-muted-foreground px-3 py-2 align-top">{card.pinyin}</td>
+                        <td className="text-muted-foreground hidden px-3 py-2 align-top md:table-cell">
                           {truncate(card.context, 60)}
                         </td>
                         <td className="px-3 py-2 align-top">
@@ -325,10 +314,10 @@ export function CardsListPage() {
                         <td className="hidden px-3 py-2 align-top whitespace-nowrap lg:table-cell">
                           {card.ease.toFixed(2)}
                         </td>
-                        <td className="hidden px-3 py-2 align-top whitespace-nowrap text-muted-foreground sm:table-cell">
+                        <td className="text-muted-foreground hidden px-3 py-2 align-top whitespace-nowrap sm:table-cell">
                           {formatDue(card.dueAt, now)}
                         </td>
-                        <td className="px-3 py-2 align-top text-right">
+                        <td className="px-3 py-2 text-right align-top">
                           <div className="inline-flex gap-1">
                             <Button
                               variant="ghost"
@@ -374,9 +363,7 @@ export function CardsListPage() {
         </Card>
       )}
 
-      {editing && (
-        <EditCardDialog card={editing} onClose={() => setEditing(null)} />
-      )}
+      {editing && <EditCardDialog card={editing} onClose={() => setEditing(null)} />}
       {history && (
         <ReviewHistoryDialog
           cardId={history.id}
@@ -397,14 +384,7 @@ interface SortableThProps {
   className?: string;
 }
 
-function SortableTh({
-  label,
-  sortKey,
-  currentSort,
-  sortDir,
-  onSort,
-  className,
-}: SortableThProps) {
+function SortableTh({ label, sortKey, currentSort, sortDir, onSort, className }: SortableThProps) {
   const active = currentSort === sortKey;
   const arrow = active ? (sortDir === 'asc' ? '▲' : '▼') : '';
   return (
@@ -412,10 +392,14 @@ function SortableTh({
       <button
         type="button"
         onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+        className="hover:text-foreground inline-flex items-center gap-1 transition-colors"
       >
         {label}
-        {arrow && <span aria-hidden className="text-xs">{arrow}</span>}
+        {arrow && (
+          <span aria-hidden className="text-xs">
+            {arrow}
+          </span>
+        )}
       </button>
     </th>
   );

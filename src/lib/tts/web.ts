@@ -6,10 +6,11 @@
 // System WebView and flaky/gesture-gated in iOS WKWebView, which is exactly why
 // the native build routes through the Capacitor plugin instead.
 
+import type { Language } from '@/types/domain';
+import { LANGUAGE_META } from '@/lib/lang/language';
 import type { VoiceInfo } from './types';
 import type { SpeakResult } from './types';
-import { getSelectedVoiceURI } from './selection';
-import { notifyVoicesChanged } from './selection';
+import { getSelectedVoiceURI, notifyVoicesChanged, pickVoice } from './selection';
 
 let cachedVoices: SpeechSynthesisVoice[] | null = null;
 let voicesListenerAttached = false;
@@ -47,18 +48,19 @@ function voiceToInfo(v: SpeechSynthesisVoice): VoiceInfo {
   };
 }
 
-function readChineseVoices(): SpeechSynthesisVoice[] {
+function readVoices(lang: Language): SpeechSynthesisVoice[] {
   if (!isAvailable()) return [];
   ensureVoicesListener();
   if (!cachedVoices || cachedVoices.length === 0) {
     cachedVoices = window.speechSynthesis.getVoices();
   }
   if (!cachedVoices) return [];
-  return cachedVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('zh'));
+  const prefix = LANGUAGE_META[lang].voicePrefix;
+  return cachedVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith(prefix));
 }
 
-export function getAvailableChineseVoices(): VoiceInfo[] {
-  return readChineseVoices()
+export function getAvailableVoices(lang: Language): VoiceInfo[] {
+  return readVoices(lang)
     .slice()
     .sort((a, b) => {
       const la = !!a.localService;
@@ -70,27 +72,22 @@ export function getAvailableChineseVoices(): VoiceInfo[] {
 }
 
 /**
- * Raw Web Speech voice used to pin `utterance.voice`. Kept returning the actual
+ * Raw Web Speech voice used to pin `utterance.voice`. Returns the actual
  * SpeechSynthesisVoice object (not VoiceInfo) because the web speak path and the
- * unit tests depend on object identity. The selection logic mirrors
- * selection.pickChineseVoice but over raw voices.
+ * unit tests depend on object identity. Delegates the selected→regional→first
+ * priority to the shared selection.pickVoice (same pattern as native.ts) and
+ * maps the chosen VoiceInfo back to its raw voice by voiceURI.
  */
-export function getChineseVoice(): SpeechSynthesisVoice | null {
-  const chinese = readChineseVoices();
-  if (chinese.length === 0) return null;
-
-  const selectedURI = getSelectedVoiceURI();
-  if (selectedURI) {
-    const found = chinese.find((v) => v.voiceURI === selectedURI);
-    if (found) return found;
-  }
-
-  const zhCN = chinese.find((v) => v.lang.toLowerCase().startsWith('zh-cn'));
-  return zhCN ?? chinese[0];
+export function getVoice(lang: Language): SpeechSynthesisVoice | null {
+  const voices = readVoices(lang);
+  if (voices.length === 0) return null;
+  const picked = pickVoice(voices.map(voiceToInfo), lang, getSelectedVoiceURI(lang));
+  if (!picked) return null;
+  return voices.find((v) => v.voiceURI === picked.voiceURI) ?? null;
 }
 
-export function getChineseVoiceInfo(): VoiceInfo | null {
-  const v = getChineseVoice();
+export function getVoiceInfo(lang: Language): VoiceInfo | null {
+  const v = getVoice(lang);
   return v ? voiceToInfo(v) : null;
 }
 
@@ -103,7 +100,7 @@ export function cancel(): void {
   }
 }
 
-export function speak(text: string): Promise<SpeakResult> {
+export function speak(text: string, lang: Language): Promise<SpeakResult> {
   if (!isAvailable()) {
     return new Promise((resolve) => {
       setTimeout(() => resolve({ spoke: false, voice: null }), 800);
@@ -116,19 +113,19 @@ export function speak(text: string): Promise<SpeakResult> {
     try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
+      utterance.lang = LANGUAGE_META[lang].ttsLang;
       utterance.rate = 0.9;
-      const voice = getChineseVoice();
+      const voice = getVoice(lang);
       if (voice) {
         utterance.voice = voice;
       }
-      utterance.onend = () => resolve({ spoke: true, voice: getChineseVoiceInfo() });
+      utterance.onend = () => resolve({ spoke: true, voice: getVoiceInfo(lang) });
       utterance.onerror = (event) => {
         const ev = event as SpeechSynthesisErrorEvent;
         resolve({
           spoke: false,
           errorType: ev.error ?? 'unknown',
-          voice: getChineseVoiceInfo(),
+          voice: getVoiceInfo(lang),
         });
       };
       window.speechSynthesis.speak(utterance);
@@ -136,7 +133,7 @@ export function speak(text: string): Promise<SpeakResult> {
       resolve({
         spoke: false,
         errorType: err instanceof Error ? err.name : 'threw',
-        voice: getChineseVoiceInfo(),
+        voice: getVoiceInfo(lang),
       });
     }
   });

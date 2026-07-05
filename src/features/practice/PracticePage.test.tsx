@@ -9,15 +9,13 @@ import { PracticePage } from './PracticePage';
 
 vi.mock('@/lib/tts/speak', () => ({
   isTtsAvailable: () => false,
-  speakChinese: vi.fn(() => Promise.resolve({ spoke: true })),
+  speak: vi.fn(() => Promise.resolve({ spoke: true })),
   cancelSpeech: vi.fn(),
-  getChineseVoiceLabel: () => null,
-  getChineseVoice: () => null,
-  getChineseVoiceInfo: () => null,
-  getAvailableChineseVoices: () => [],
+  getAvailableVoices: () => [],
   getSelectedVoiceURI: () => null,
   setSelectedVoiceURI: vi.fn(),
   subscribeToVoicesChanged: () => () => {},
+  openVoiceInstallSettings: vi.fn(() => Promise.resolve()),
 }));
 
 function renderWithRouter() {
@@ -83,17 +81,15 @@ describe('PracticePage', () => {
     expect(
       screen.getByText(
         (_, el) =>
-          el?.className === 'text-sm text-muted-foreground' &&
+          el?.classList.contains('text-sm') === true &&
+          el.classList.contains('text-muted-foreground') &&
           (el.textContent ?? '').replace(/\s+/g, ' ').trim() === '1 / 3',
       ),
     ).toBeInTheDocument();
   });
 
   it('advances Step 1 → Step 2 → Step 3 with the "Дальше" button at the end', async () => {
-    await addCards(
-      [{ word: '一', pinyin: 'yī', context: '**一** один' }],
-      Date.now(),
-    );
+    await addCards([{ word: '一', pinyin: 'yī', context: '**一** один' }], Date.now());
 
     const user = userEvent.setup();
     renderWithRouter();
@@ -133,7 +129,8 @@ describe('PracticePage', () => {
     expect(
       screen.getByText(
         (_, el) =>
-          el?.className === 'text-sm text-muted-foreground' &&
+          el?.classList.contains('text-sm') === true &&
+          el.classList.contains('text-muted-foreground') &&
           (el.textContent ?? '').replace(/\s+/g, ' ').trim() === '2 / 2',
       ),
     ).toBeInTheDocument();

@@ -2,9 +2,23 @@ export type Rating = 'again' | 'hard' | 'good' | 'easy';
 
 export type CardStage = 'new' | 'learning' | 'young' | 'mature' | 'relearning';
 
+/** Study language a card belongs to. See src/lib/lang/language.ts. */
+export type Language = 'zh' | 'ko';
+
 export interface Card {
   id: string;
+  /**
+   * The study language of this card. Drives TTS locale, the label of the
+   * reading step and which "world" the card appears in. Cards created before
+   * multi-language support are backfilled to 'zh' by the v4 DB migration.
+   */
+  lang: Language;
   word: string;
+  /**
+   * Phonetic reading: pinyin for Chinese, Revised-Romanization (romaja) for
+   * Korean. The field keeps its original name for storage/back-compat; the UI
+   * labels it per language via LANGUAGE_META[lang].readingLabel.
+   */
   pinyin: string;
   context: string;
 

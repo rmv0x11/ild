@@ -15,6 +15,7 @@ const NOW = new Date(2026, 4, 20, 12, 0, 0).getTime();
 function makeCard(partial: Partial<Card> & Pick<Card, 'id' | 'word'>): Card {
   return {
     id: partial.id,
+    lang: partial.lang ?? 'zh',
     word: partial.word,
     pinyin: partial.pinyin ?? 'p',
     context: partial.context ?? 'c',

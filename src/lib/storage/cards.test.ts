@@ -66,6 +66,7 @@ describe('cards repository', () => {
 
   it('orders due cards by stage priority then by dueAt', async () => {
     const base: Omit<Card, 'id' | 'stage' | 'word'> = {
+      lang: 'zh',
       pinyin: 'p',
       context: 'c',
       learningStep: 0,
@@ -98,6 +99,7 @@ describe('cards repository', () => {
 
   it('orders by dueAt asc within the same stage', async () => {
     const base: Omit<Card, 'id' | 'dueAt' | 'word'> = {
+      lang: 'zh',
       pinyin: 'p',
       context: 'c',
       stage: 'young',
@@ -120,6 +122,7 @@ describe('cards repository', () => {
 
   it('computes stats correctly per stage', async () => {
     const base: Omit<Card, 'id' | 'stage' | 'word' | 'dueAt'> = {
+      lang: 'zh',
       pinyin: 'p',
       context: 'c',
       learningStep: 0,
@@ -156,16 +159,12 @@ describe('cards repository', () => {
   describe('deck filtering', () => {
     beforeEach(async () => {
       await clearAll();
-      await addCards(
-        [{ word: 'hsk1-a', pinyin: 'a', context: '**a** A' }],
-        NOW,
-        { deckId: 'hsk-1' },
-      );
-      await addCards(
-        [{ word: 'hsk2-a', pinyin: 'b', context: '**b** B' }],
-        NOW,
-        { deckId: 'hsk-2' },
-      );
+      await addCards([{ word: 'hsk1-a', pinyin: 'a', context: '**a** A' }], NOW, {
+        deckId: 'hsk-1',
+      });
+      await addCards([{ word: 'hsk2-a', pinyin: 'b', context: '**b** B' }], NOW, {
+        deckId: 'hsk-2',
+      });
       await addCards([{ word: 'no-deck', pinyin: 'c', context: '**c** C' }], NOW);
     });
 
@@ -176,18 +175,18 @@ describe('cards repository', () => {
       expect(tagged[0].word).toBe('hsk1-a');
     });
 
-    it('getAllCards(deckId) returns only that deck', async () => {
-      const onlyHsk1 = await getAllCards('hsk-1');
+    it('getAllCards(lang, deckId) returns only that deck', async () => {
+      const onlyHsk1 = await getAllCards('zh', 'hsk-1');
       expect(onlyHsk1.map((c) => c.word)).toEqual(['hsk1-a']);
     });
 
     it('getNextDueCard honors the deck filter', async () => {
-      const next = await getNextDueCard(NOW, 'hsk-2');
+      const next = await getNextDueCard(NOW, 'zh', 'hsk-2');
       expect(next?.word).toBe('hsk2-a');
     });
 
-    it('getStats(now, deckId) only counts cards in that deck', async () => {
-      const stats = await getStats(NOW, 'hsk-1');
+    it('getStats(now, lang, deckId) only counts cards in that deck', async () => {
+      const stats = await getStats(NOW, 'zh', 'hsk-1');
       expect(stats.total).toBe(1);
       expect(stats.new).toBe(1);
     });

@@ -3,6 +3,7 @@ import { Layers } from 'lucide-react';
 import { getKnownDeckIds } from '@/lib/storage/cards';
 import { DECK_ALL } from '@/lib/storage/deckFilter';
 import { getPreset } from '@/lib/presets';
+import { useActiveLanguage } from '@/features/lang/useActiveLanguage';
 import { useDeckFilter } from './useDeckFilter';
 
 /**
@@ -12,20 +13,21 @@ import { useDeckFilter } from './useDeckFilter';
  */
 export function DeckSelector() {
   const [filter, setFilter] = useDeckFilter();
-  const knownIds = useLiveQuery(() => getKnownDeckIds(), []);
+  const [lang] = useActiveLanguage();
+  const knownIds = useLiveQuery(() => getKnownDeckIds(lang), [lang]);
 
   if (knownIds === undefined) return null;
   if (knownIds.length === 0) return null;
 
   return (
-    <label className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+    <label className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
       <Layers className="h-4 w-4" />
       <span>Колода:</span>
       <select
         aria-label="Выбор колоды"
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
-        className="rounded border bg-background px-2 py-1 text-sm"
+        className="bg-background rounded border px-2 py-1 text-sm"
         data-testid="deck-selector"
       >
         <option value={DECK_ALL}>Все колоды</option>

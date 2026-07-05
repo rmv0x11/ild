@@ -18,6 +18,16 @@ describe('parseDeckCsv', () => {
     expect(rows[1].context).toContain('谢谢');
   });
 
+  it('recognizes a Korean-language header and does not import it as a card', () => {
+    const text = '단어,발음,의미\n사과,sagwa,яблоко\n책,chaek,книга';
+    const { rows, errors } = parseDeckCsv(text);
+    expect(errors).toEqual([]);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].word).toBe('사과');
+    expect(rows[0].pinyin).toBe('sagwa');
+    expect(rows.some((r) => r.word === '단어')).toBe(false);
+  });
+
   it('ignores the BOM at the start of the input', () => {
     const withBom = '﻿' + SAMPLE_CSV;
     const { rows, errors } = parseDeckCsv(withBom);

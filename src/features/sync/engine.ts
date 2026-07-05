@@ -1,6 +1,7 @@
 import { db } from '@/lib/storage/db';
 import { ApiError } from '@/lib/api/client';
 import type { Card, ReviewLog } from '@/types/domain';
+import { normalizeLanguage } from '@/lib/lang/language';
 import {
   pullCards as apiPullCards,
   pushCards as apiPushCards,
@@ -87,9 +88,15 @@ async function applyPulledCards(cards: CardWire[]): Promise<void> {
         continue;
       }
 
-      // Strip wire-only fields before persisting to local Card store.
+      // Strip wire-only fields before persisting to local Card store. The sync
+      // server predates multi-language and does not round-trip `lang`, so a
+      // pulled copy may arrive without it. Fall back to the existing local
+      // card's language before defaulting to Chinese — this stops a locally
+      // Korean card from being silently reclassified as Chinese on every pull.
       const { deletedAt: _deletedAt, ...rest } = remote;
-      toPut.push(rest as Card);
+      const card = rest as Card;
+      card.lang = normalizeLanguage(card.lang ?? local?.lang);
+      toPut.push(card);
     }
 
     if (toPut.length > 0) {

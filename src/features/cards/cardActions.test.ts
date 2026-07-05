@@ -7,6 +7,7 @@ import { deleteCard, resetCardProgress, updateCardFields } from './cardActions';
 function makeCard(overrides: Partial<Card> = {}): Card {
   return {
     id: 'c-1',
+    lang: 'zh',
     word: '你好',
     pinyin: 'nǐ hǎo',
     context: 'hello',

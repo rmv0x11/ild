@@ -1,13 +1,14 @@
-import type { Card, CardStage, Rating } from '@/types/domain';
+import type { Card, CardStage, Language, Rating } from '@/types/domain';
 import { uuid } from '@/lib/uuid';
 import { DAY_MS, MINUTE_MS, SM2_DEFAULTS } from './constants';
 
 export function createNewCard(
-  input: { word: string; pinyin: string; context: string },
+  input: { word: string; pinyin: string; context: string; lang?: Language },
   now: number,
 ): Card {
   return {
     id: uuid(),
+    lang: input.lang ?? 'zh',
     word: input.word,
     pinyin: input.pinyin,
     context: input.context,

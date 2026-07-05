@@ -29,13 +29,28 @@ const HEADER_ALIASES = new Map<string, FieldKey>([
   ['word', 'word'],
   ['слово', 'word'],
   ['иероглиф', 'word'],
+  ['단어', 'word'],
+  ['어휘', 'word'],
+  ['낱말', 'word'],
   ['pinyin', 'pinyin'],
   ['пиньинь', 'pinyin'],
+  ['romanization', 'pinyin'],
+  ['romanisation', 'pinyin'],
+  ['romaja', 'pinyin'],
+  ['reading', 'pinyin'],
+  ['romanized', 'pinyin'],
+  ['романизация', 'pinyin'],
+  ['чтение', 'pinyin'],
+  ['발음', 'pinyin'],
+  ['로마자', 'pinyin'],
   ['context', 'context'],
   ['контекст', 'context'],
   ['перевод', 'context'],
   ['translation', 'context'],
   ['meaning', 'context'],
+  ['의미', 'context'],
+  ['뜻', 'context'],
+  ['번역', 'context'],
   ['synonym', 'synonym'],
   ['synonyms', 'synonym'],
   ['синоним', 'synonym'],
@@ -57,7 +72,9 @@ const REQUIRED_LABELS: Record<(typeof REQUIRED_KEYS)[number], string> = {
 
 const DELIMITERS = [',', ';', '\t', '|'];
 const ANY_DELIMITER = /[,;\t|]/;
-const HAS_CJK = /\p{Script=Han}/u;
+// A "word" cell in the target language: Chinese Han characters or Korean Hangul.
+// Used to tell a data row from a stray non-header first line.
+const HAS_WORD_SCRIPT = /\p{Script=Han}|\p{Script=Hangul}/u;
 // U+FFFD / NUL появляются, когда cp1251- или UTF-16-файл декодировали как UTF-8
 function hasEncodingGarbage(text: string): boolean {
   return text.includes('\uFFFD') || text.includes('\u0000');
@@ -138,11 +155,11 @@ function detectLayout(matrix: string[][]): ColumnLayout {
     };
   }
 
-  // Беззаголовочные данные. Первая строка без иероглифов над строками с иероглифами —
-  // почти наверняка нераспознанный заголовок (front;back;…), а не карточка.
-  const laterHasCjk = nonEmpty.slice(1).some((i) => HAS_CJK.test(matrix[i][0] ?? ''));
+  // Беззаголовочные данные. Первая строка без иероглифов/хангыля над строками с
+  // ними — почти наверняка нераспознанный заголовок (front;back;…), а не карточка.
+  const laterHasScript = nonEmpty.slice(1).some((i) => HAS_WORD_SCRIPT.test(matrix[i][0] ?? ''));
   const firstWord = firstCells[0] ?? '';
-  if (firstWord !== '' && !HAS_CJK.test(firstWord) && laterHasCjk) {
+  if (firstWord !== '' && !HAS_WORD_SCRIPT.test(firstWord) && laterHasScript) {
     return {
       indexOf: positionalIndex(),
       dataStart: first + 1,

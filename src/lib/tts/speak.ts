@@ -1,16 +1,16 @@
-// Public TTS facade. Keeps the exact surface the app shipped with
-// (speakChinese, the voice helpers, VoiceInfo/SpeakResult) so consumers
-// (ReviewStep1/2, ReviewPage, main.tsx, tests) need no changes, while routing
-// to the right provider:
+// Public TTS facade. Language-parameterized: every entry point takes a Language
+// so the same picker/synthesizer serves both Chinese (zh-CN) and Korean (ko-KR).
+// It routes to the right provider:
 //
-//   - web      → Web Speech API (./web) — unchanged, battle-tested path.
+//   - web      → Web Speech API (./web) — the battle-tested, deliberately-bare path.
 //   - native   → Capacitor @capacitor-community/text-to-speech (./native) —
-//                AVSpeechSynthesizer / Android TextToSpeech, reliable offline
-//                zh-CN, no WebView gesture limitation.
+//                AVSpeechSynthesizer / Android TextToSpeech, reliable offline,
+//                no WebView gesture limitation.
 //
-// Voice-selection persistence + change notifications live in ./selection and are
-// shared, so the voice picker behaves identically on both.
+// Voice-selection persistence (per language) + change notifications live in
+// ./selection and are shared, so the voice picker behaves identically on both.
 
+import type { Language } from '@/types/domain';
 import type { SpeakResult, VoiceInfo } from './types';
 import { isNativeTts } from './platform';
 import {
@@ -34,25 +34,16 @@ export function warmUpTts(): void {
   else web.warmUp();
 }
 
-export function getAvailableChineseVoices(): VoiceInfo[] {
-  return isNativeTts() ? native.getAvailableChineseVoices() : web.getAvailableChineseVoices();
+export function getAvailableVoices(lang: Language): VoiceInfo[] {
+  return isNativeTts() ? native.getAvailableVoices(lang) : web.getAvailableVoices(lang);
 }
 
-/**
- * Raw Web Speech voice — only meaningful on the web path (used to pin
- * `utterance.voice`). Returns null on native, where voices are selected by index
- * inside the provider. No app code reads this on native; kept for the web tests.
- */
-export function getChineseVoice(): SpeechSynthesisVoice | null {
-  return isNativeTts() ? null : web.getChineseVoice();
+export function getVoiceInfo(lang: Language): VoiceInfo | null {
+  return isNativeTts() ? native.getVoiceInfo(lang) : web.getVoiceInfo(lang);
 }
 
-export function getChineseVoiceInfo(): VoiceInfo | null {
-  return isNativeTts() ? native.getChineseVoiceInfo() : web.getChineseVoiceInfo();
-}
-
-export function getChineseVoiceLabel(): string | null {
-  const info = getChineseVoiceInfo();
+export function getVoiceLabel(lang: Language): string | null {
+  const info = getVoiceInfo(lang);
   if (!info) return null;
   return `${info.name} (${info.lang})`;
 }
@@ -70,13 +61,13 @@ export function cancelSpeech(): void {
   else web.cancel();
 }
 
-export function speakChinese(text: string): Promise<SpeakResult> {
-  return isNativeTts() ? native.speak(text) : web.speak(text);
+export function speak(text: string, lang: Language): Promise<SpeakResult> {
+  return isNativeTts() ? native.speak(text, lang) : web.speak(text, lang);
 }
 
 /**
- * Android only: open the system TTS settings so the user can install a Mandarin
- * voice pack. No-op on web/iOS. Wire into the "no Chinese voice" UI on native.
+ * Android only: open the system TTS settings so the user can install a voice
+ * pack. No-op on web/iOS. Wire into the "no voice" UI on native.
  */
 export function openVoiceInstallSettings(): Promise<void> {
   return isNativeTts() ? native.openVoiceInstall() : Promise.resolve();

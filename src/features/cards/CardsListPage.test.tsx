@@ -20,6 +20,7 @@ const NOW = 1_700_000_000_000;
 function makeCard(overrides: Partial<Card>): Card {
   return {
     id: 'c-1',
+    lang: 'zh',
     word: '你好',
     pinyin: 'nǐ hǎo',
     context: 'hello world',
@@ -114,10 +115,7 @@ describe('CardsListPage', () => {
   });
 
   it('deletes a card via the confirm prompt', async () => {
-    await db.cards.bulkAdd([
-      makeCard({ id: 'a', word: '一' }),
-      makeCard({ id: 'b', word: '二' }),
-    ]);
+    await db.cards.bulkAdd([makeCard({ id: 'a', word: '一' }), makeCard({ id: 'b', word: '二' })]);
 
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);

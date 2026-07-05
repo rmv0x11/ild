@@ -6,13 +6,15 @@ import type { Card as DomainCard, Rating } from '@/types/domain';
 import { rateCard } from '@/lib/sm2/algorithm';
 import { getNextDueCard, getStats, updateCard } from '@/lib/storage/cards';
 import { logReview } from '@/lib/storage/reviews';
-import { speakChinese } from '@/lib/tts/speak';
+import { normalizeLanguage } from '@/lib/lang/language';
+import { speak } from '@/lib/tts/speak';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DeckSelector } from '@/features/deck/DeckSelector';
 import { useDeckFilter } from '@/features/deck/useDeckFilter';
+import { useActiveLanguage } from '@/features/lang/useActiveLanguage';
 import { DECK_ALL } from '@/lib/storage/deckFilter';
 import { StreakBadge } from '@/features/stats/StreakBadge';
 import { useAchievementUnlocks } from '@/features/stats/useAchievementUnlocks';
@@ -24,12 +26,13 @@ type Step = 1 | 2 | 3;
 
 export function ReviewPage() {
   const [filter] = useDeckFilter();
+  const [lang] = useActiveLanguage();
   useAchievementUnlocks();
   const currentCard = useLiveQuery<DomainCard | undefined>(
-    () => getNextDueCard(Date.now(), filter),
-    [filter],
+    () => getNextDueCard(Date.now(), lang, filter),
+    [filter, lang],
   );
-  const stats = useLiveQuery(() => getStats(Date.now(), filter), [filter]);
+  const stats = useLiveQuery(() => getStats(Date.now(), lang, filter), [filter, lang]);
   const isFiltered = filter !== DECK_ALL;
 
   if (currentCard === undefined && stats === undefined) {
@@ -37,10 +40,10 @@ export function ReviewPage() {
       <div className="flex animate-pulse flex-col gap-4">
         <div className="flex gap-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-6 w-20 rounded bg-muted" />
+            <div key={i} className="bg-muted h-6 w-20 rounded" />
           ))}
         </div>
-        <div className="h-72 rounded-lg bg-muted" />
+        <div className="bg-muted h-72 rounded-lg" />
       </div>
     );
   }
@@ -63,15 +66,15 @@ export function ReviewPage() {
       {!currentCard ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-16">
-            <div className="rounded-full bg-muted p-6">
-              <BookOpen className="h-12 w-12 text-muted-foreground" />
+            <div className="bg-muted rounded-full p-6">
+              <BookOpen className="text-muted-foreground h-12 w-12" />
             </div>
             <div className="text-lg font-medium">
               {isFiltered
                 ? 'В выбранной колоде нет карточек к повторению'
                 : 'Карточек к повторению нет'}
             </div>
-            <p className="max-w-sm text-center text-sm text-muted-foreground">
+            <p className="text-muted-foreground max-w-sm text-center text-sm">
               {isFiltered
                 ? 'Переключите фильтр на «Все колоды» или подождите, пока подойдёт следующий повтор.'
                 : 'Загрузите CSV-колоду, чтобы начать заниматься. Или попробуйте пример из 4 слов.'}
@@ -82,10 +85,7 @@ export function ReviewPage() {
               </Link>
               {(stats?.total ?? 0) > 0 && (
                 <>
-                  <Link
-                    to="/cards"
-                    className={buttonVariants({ variant: 'outline', size: 'lg' })}
-                  >
+                  <Link to="/cards" className={buttonVariants({ variant: 'outline', size: 'lg' })}>
                     Открыть колоду
                   </Link>
                   <Link
@@ -109,6 +109,7 @@ export function ReviewPage() {
 function ReviewCardSession({ card }: { card: DomainCard }) {
   const [step, setStep] = useState<Step>(1);
   const [submitting, setSubmitting] = useState(false);
+  const lang = normalizeLanguage(card.lang);
 
   const handleRate = useCallback(
     async (rating: Rating): Promise<void> => {
@@ -144,7 +145,7 @@ function ReviewCardSession({ card }: { card: DomainCard }) {
         e.preventDefault();
         // Mirror ReviewStep1.onClick: fire TTS synchronously inside the
         // user-keypress event so the browser keeps its autoplay activation.
-        void speakChinese(card.word);
+        void speak(card.word, lang);
         setStep(2);
       } else if (step === 2 && (e.key === ' ' || e.key === 'Enter')) {
         const btn = document.querySelector<HTMLButtonElement>('button[data-step3-trigger]');
@@ -168,11 +169,11 @@ function ReviewCardSession({ card }: { card: DomainCard }) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [step, handleRate, card.word]);
+  }, [step, handleRate, card.word, lang]);
 
   return (
     <>
-      <div className="mb-3 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+      <div className="text-muted-foreground mb-3 flex items-center justify-center gap-2 text-sm">
         <span aria-label={`Шаг ${step} из 3`}>Шаг {step} / 3</span>
         <div className="flex gap-1">
           {[1, 2, 3].map((i) => (
@@ -190,18 +191,19 @@ function ReviewCardSession({ card }: { card: DomainCard }) {
       <Card>
         <CardContent className="pt-6">
           <div key={step} className="animate-in fade-in duration-300">
-            {step === 1 && <ReviewStep1 word={card.word} onNext={() => setStep(2)} />}
+            {step === 1 && <ReviewStep1 word={card.word} lang={lang} onNext={() => setStep(2)} />}
             {step === 2 && (
               <ReviewStep2
                 word={card.word}
-                pinyin={card.pinyin}
+                reading={card.pinyin}
+                lang={lang}
                 onNext={() => setStep(3)}
               />
             )}
             {step === 3 && (
               <ReviewStep3
                 word={card.word}
-                pinyin={card.pinyin}
+                reading={card.pinyin}
                 context={card.context}
                 onRate={handleRate}
                 disabled={submitting}
@@ -211,11 +213,10 @@ function ReviewCardSession({ card }: { card: DomainCard }) {
         </CardContent>
       </Card>
 
-      <div className="mt-3 text-center text-xs text-muted-foreground">
-        Подсказка:{' '}
-        <kbd className="rounded border bg-muted px-1.5 py-0.5">Space</kbd> — далее, цифры{' '}
-        <kbd className="rounded border bg-muted px-1.5 py-0.5">1</kbd>—
-        <kbd className="rounded border bg-muted px-1.5 py-0.5">4</kbd> — оценка
+      <div className="text-muted-foreground mt-3 text-center text-xs">
+        Подсказка: <kbd className="bg-muted rounded border px-1.5 py-0.5">Space</kbd> — далее, цифры{' '}
+        <kbd className="bg-muted rounded border px-1.5 py-0.5">1</kbd>—
+        <kbd className="bg-muted rounded border px-1.5 py-0.5">4</kbd> — оценка
       </div>
     </>
   );

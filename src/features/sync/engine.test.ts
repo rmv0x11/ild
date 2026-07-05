@@ -25,6 +25,7 @@ const mockedPushReviews = vi.mocked(api.pushReviews);
 function makeCard(overrides: Partial<Card> = {}): Card {
   return {
     id: overrides.id ?? 'card-1',
+    lang: 'zh',
     word: '你好',
     pinyin: 'nǐ hǎo',
     context: 'hello',
@@ -78,9 +79,7 @@ describe('engine.pull (cards)', () => {
 
   it('deletes local cards when the server reports a tombstone', async () => {
     await db.cards.put(makeCard({ id: 'doomed', updatedAt: 100 }));
-    const cards: CardWire[] = [
-      { ...makeCard({ id: 'doomed', updatedAt: 200 }), deletedAt: 199 },
-    ];
+    const cards: CardWire[] = [{ ...makeCard({ id: 'doomed', updatedAt: 200 }), deletedAt: 199 }];
     mockedPullCards.mockResolvedValueOnce({ cards, nextSince: 250 });
 
     await pull();
@@ -99,6 +98,30 @@ describe('engine.pull (cards)', () => {
     const stored = await db.cards.get('a');
     expect(stored?.word).toBe('local');
     expect(stored?.updatedAt).toBe(500);
+  });
+
+  it('preserves the local language when the server echoes a card without lang', async () => {
+    await db.cards.put(makeCard({ id: 'a', lang: 'ko', word: '사과', updatedAt: 100 }));
+    // The sync server predates multi-language and returns the card with no lang.
+    const wire = { ...makeCard({ id: 'a', word: '사과', updatedAt: 200 }) } as CardWire;
+    delete (wire as { lang?: unknown }).lang;
+    mockedPullCards.mockResolvedValueOnce({ cards: [wire], nextSince: 200 });
+
+    await pull();
+
+    const stored = await db.cards.get('a');
+    expect(stored?.lang).toBe('ko');
+    expect(stored?.updatedAt).toBe(200);
+  });
+
+  it('defaults lang to zh for a lang-less card with no local copy', async () => {
+    const wire = { ...makeCard({ id: 'fresh', updatedAt: 100 }) } as CardWire;
+    delete (wire as { lang?: unknown }).lang;
+    mockedPullCards.mockResolvedValueOnce({ cards: [wire], nextSince: 100 });
+
+    await pull();
+
+    expect((await db.cards.get('fresh'))?.lang).toBe('zh');
   });
 
   it('overwrites when server copy is newer (LWW)', async () => {

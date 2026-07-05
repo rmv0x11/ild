@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Card as DomainCard } from '@/types/domain';
+import { getLanguageMeta, normalizeLanguage } from '@/lib/lang/language';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,7 +61,7 @@ export function EditCardDialog({ card, onClose }: EditCardDialogProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+      className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-card-title"
@@ -68,7 +69,7 @@ export function EditCardDialog({ card, onClose }: EditCardDialogProps) {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="w-full max-w-md rounded-lg border bg-card text-card-foreground shadow-lg">
+      <div className="bg-card text-card-foreground w-full max-w-md rounded-lg border shadow-lg">
         <div className="flex items-center justify-between border-b p-4">
           <h2 id="edit-card-title" className="text-lg font-semibold">
             Редактирование карточки
@@ -77,7 +78,7 @@ export function EditCardDialog({ card, onClose }: EditCardDialogProps) {
             type="button"
             onClick={handleClose}
             aria-label="Закрыть"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
             <X />
           </button>
@@ -100,7 +101,9 @@ export function EditCardDialog({ card, onClose }: EditCardDialogProps) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-pinyin">Пиньинь</Label>
+            <Label htmlFor="edit-pinyin">
+              {getLanguageMeta(normalizeLanguage(card.lang)).readingLabel}
+            </Label>
             <Input
               id="edit-pinyin"
               value={pinyin}
@@ -117,12 +120,12 @@ export function EditCardDialog({ card, onClose }: EditCardDialogProps) {
               onChange={(e) => setContext(e.target.value)}
               disabled={saving}
               rows={4}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-md border px-3 py-2 text-sm shadow-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
           {error && (
-            <div className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <div className="border-destructive bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
               {error}
             </div>
           )}

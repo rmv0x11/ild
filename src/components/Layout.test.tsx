@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { vi } from 'vitest';
@@ -42,6 +42,18 @@ function renderLayout(initialPath = '/review') {
   );
 }
 
+// Nav items are rendered twice: the desktop nav in the header and the mobile
+// bottom tab bar (both are in the DOM under jsdom since media queries don't
+// apply). The desktop nav has no accessible name; the mobile bar is labelled
+// "Навигация". Only the desktop nav toggles font-bold/underline on the active
+// link, so scope link queries to it.
+function getDesktopNav() {
+  const navs = screen.getAllByRole('navigation');
+  const desktop = navs.find((nav) => !nav.getAttribute('aria-label'));
+  if (!desktop) throw new Error('desktop nav not found');
+  return desktop;
+}
+
 describe('Layout', () => {
   it('renders header with title "ild"', () => {
     renderLayout();
@@ -52,18 +64,10 @@ describe('Layout', () => {
 
   it('navigation has links to Повторение, Импорт, and Статистика', () => {
     renderLayout();
-    expect(screen.getByRole('link', { name: 'Повторение' })).toHaveAttribute(
-      'href',
-      '/review',
-    );
-    expect(screen.getByRole('link', { name: 'Импорт' })).toHaveAttribute(
-      'href',
-      '/import',
-    );
-    expect(screen.getByRole('link', { name: 'Статистика' })).toHaveAttribute(
-      'href',
-      '/stats',
-    );
+    const nav = within(getDesktopNav());
+    expect(nav.getByRole('link', { name: 'Повторение' })).toHaveAttribute('href', '/review');
+    expect(nav.getByRole('link', { name: 'Импорт' })).toHaveAttribute('href', '/import');
+    expect(nav.getByRole('link', { name: 'Статистика' })).toHaveAttribute('href', '/stats');
   });
 
   it('renders the active route content via Outlet', () => {
@@ -73,11 +77,12 @@ describe('Layout', () => {
 
   it('marks the active NavLink with bold/underline classes', () => {
     renderLayout('/review');
-    const active = screen.getByRole('link', { name: 'Повторение' });
+    const nav = within(getDesktopNav());
+    const active = nav.getByRole('link', { name: 'Повторение' });
     expect(active.className).toMatch(/font-bold/);
     expect(active.className).toMatch(/underline/);
 
-    const inactive = screen.getByRole('link', { name: 'Импорт' });
+    const inactive = nav.getByRole('link', { name: 'Импорт' });
     expect(inactive.className).not.toMatch(/font-bold/);
   });
 
@@ -87,12 +92,12 @@ describe('Layout', () => {
 
     expect(screen.getByText('review-stub')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('link', { name: 'Импорт' }));
+    await user.click(within(getDesktopNav()).getByRole('link', { name: 'Импорт' }));
 
     expect(screen.getByText('import-stub')).toBeInTheDocument();
     expect(screen.queryByText('review-stub')).not.toBeInTheDocument();
 
-    const activeNow = screen.getByRole('link', { name: 'Импорт' });
+    const activeNow = within(getDesktopNav()).getByRole('link', { name: 'Импорт' });
     expect(activeNow.className).toMatch(/font-bold/);
   });
 });

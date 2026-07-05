@@ -1,4 +1,5 @@
-import type { Card, CardStage, CsvRow, DeckStats } from '@/types/domain';
+import type { Card, CardStage, CsvRow, DeckStats, Language } from '@/types/domain';
+import { DEFAULT_LANGUAGE } from '@/lib/lang/language';
 import { uuid } from '@/lib/uuid';
 import { db } from './db';
 import { DECK_ALL, matchesDeckFilter } from './deckFilter';
@@ -21,6 +22,8 @@ export interface AddCardsOptions {
   /** Tag the imported cards with this deck id (preset id). Existing cards
    * matched by `word` are NOT re-tagged — they keep their original deckId. */
   deckId?: string;
+  /** Study language of the imported cards. Defaults to Chinese. */
+  lang?: Language;
 }
 
 export async function addCards(
@@ -28,6 +31,7 @@ export async function addCards(
   now: number,
   options: AddCardsOptions = {},
 ): Promise<{ added: number; skipped: number }> {
+  const lang = options.lang ?? DEFAULT_LANGUAGE;
   let added = 0;
   let skipped = 0;
 
@@ -35,13 +39,20 @@ export async function addCards(
 
   await db.transaction('rw', db.cards, async () => {
     for (const row of rows) {
-      const existing = await db.cards.where('word').equals(row.word).first();
+      // Dedupe within the same language only — the identical string could
+      // legitimately exist as a different-language card.
+      const existing = await db.cards
+        .where('word')
+        .equals(row.word)
+        .and((c) => c.lang === lang)
+        .first();
       if (existing) {
         skipped += 1;
         continue;
       }
       const card: Card = {
         id: uuid(),
+        lang,
         word: row.word,
         pinyin: row.pinyin,
         context: row.context,
@@ -70,10 +81,15 @@ export async function addCards(
 
 export async function getDueCards(
   now: number,
-  options: { deckFilter?: string; limit?: number } = {},
+  options: { lang?: Language; deckFilter?: string; limit?: number } = {},
 ): Promise<Card[]> {
-  const { deckFilter = DECK_ALL, limit } = options;
-  let due = await db.cards.where('dueAt').belowOrEqual(now).toArray();
+  const { lang = DEFAULT_LANGUAGE, deckFilter = DECK_ALL, limit } = options;
+  // [lang+dueAt] compound index: dueAt is a non-negative epoch, so [lang, 0]
+  // .. [lang, now] captures every due card of this language.
+  let due = await db.cards
+    .where('[lang+dueAt]')
+    .between([lang, 0], [lang, now], true, true)
+    .toArray();
 
   if (deckFilter !== DECK_ALL) {
     due = due.filter((c) => matchesDeckFilter(c.deckId, deckFilter));
@@ -94,9 +110,10 @@ export async function getDueCards(
 
 export async function getNextDueCard(
   now: number,
+  lang: Language = DEFAULT_LANGUAGE,
   deckFilter: string = DECK_ALL,
 ): Promise<Card | undefined> {
-  const [first] = await getDueCards(now, { deckFilter, limit: 1 });
+  const [first] = await getDueCards(now, { lang, deckFilter, limit: 1 });
   return first;
 }
 
@@ -104,31 +121,53 @@ export async function updateCard(card: Card): Promise<void> {
   await db.cards.put(card);
 }
 
-export async function getAllCards(deckFilter: string = DECK_ALL): Promise<Card[]> {
-  const all = await db.cards.toArray();
+export async function getAllCards(
+  lang: Language = DEFAULT_LANGUAGE,
+  deckFilter: string = DECK_ALL,
+): Promise<Card[]> {
+  const all = await db.cards.where('lang').equals(lang).toArray();
   if (deckFilter === DECK_ALL) return all;
   return all.filter((c) => matchesDeckFilter(c.deckId, deckFilter));
 }
 
-export async function clearAll(): Promise<void> {
+/** Delete cards (and their review logs). Scoped to one language when given,
+ *  otherwise wipes everything. */
+export async function clearAll(lang?: Language): Promise<void> {
   await db.transaction('rw', db.cards, db.reviews, async () => {
-    await db.cards.clear();
-    await db.reviews.clear();
+    if (!lang) {
+      await db.cards.clear();
+      await db.reviews.clear();
+      return;
+    }
+    const ids = (await db.cards.where('lang').equals(lang).primaryKeys()) as string[];
+    await db.cards.where('lang').equals(lang).delete();
+    if (ids.length > 0) {
+      await db.reviews.where('cardId').anyOf(ids).delete();
+    }
   });
 }
 
-export async function getStats(now: number, deckFilter: string = DECK_ALL): Promise<DeckStats> {
+export async function getStats(
+  now: number,
+  lang: Language = DEFAULT_LANGUAGE,
+  deckFilter: string = DECK_ALL,
+): Promise<DeckStats> {
   if (deckFilter === DECK_ALL) {
+    const stageCount = (stage: CardStage): Promise<number> =>
+      db.cards.where('[lang+stage]').equals([lang, stage]).count();
+    const dueCount = (until: number): Promise<number> =>
+      db.cards.where('[lang+dueAt]').between([lang, 0], [lang, until], true, true).count();
+
     const [total, newCount, learning, young, mature, relearning, dueNow, dueToday] =
       await Promise.all([
-        db.cards.count(),
-        db.cards.where('stage').equals('new').count(),
-        db.cards.where('stage').equals('learning').count(),
-        db.cards.where('stage').equals('young').count(),
-        db.cards.where('stage').equals('mature').count(),
-        db.cards.where('stage').equals('relearning').count(),
-        db.cards.where('dueAt').belowOrEqual(now).count(),
-        db.cards.where('dueAt').belowOrEqual(endOfTodayMs(now)).count(),
+        db.cards.where('lang').equals(lang).count(),
+        stageCount('new'),
+        stageCount('learning'),
+        stageCount('young'),
+        stageCount('mature'),
+        stageCount('relearning'),
+        dueCount(now),
+        dueCount(endOfTodayMs(now)),
       ]);
 
     return { total, new: newCount, learning, young, mature, relearning, dueNow, dueToday };
@@ -180,10 +219,13 @@ export async function getStats(now: number, deckFilter: string = DECK_ALL): Prom
 }
 
 /** Distinct list of deckIds currently present in the cards table. Used to
- * build the deck-selector dropdown only with decks the user actually owns. */
-export async function getKnownDeckIds(): Promise<string[]> {
+ * build the deck-selector dropdown only with decks the user actually owns.
+ * Scoped to one language when given (the selector), unscoped for global
+ * checks like achievements. */
+export async function getKnownDeckIds(lang?: Language): Promise<string[]> {
   const ids = new Set<string>();
-  await db.cards.each((c) => {
+  const collection = lang ? db.cards.where('lang').equals(lang) : db.cards.toCollection();
+  await collection.each((c) => {
     if (typeof c.deckId === 'string' && c.deckId.length > 0) {
       ids.add(c.deckId);
     }

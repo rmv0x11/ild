@@ -8,15 +8,13 @@ import { ReviewPage } from './ReviewPage';
 
 vi.mock('@/lib/tts/speak', () => ({
   isTtsAvailable: () => false,
-  speakChinese: vi.fn(() => Promise.resolve({ spoke: true })),
+  speak: vi.fn(() => Promise.resolve({ spoke: true })),
   cancelSpeech: vi.fn(),
-  getChineseVoiceLabel: () => null,
-  getChineseVoice: () => null,
-  getChineseVoiceInfo: () => null,
-  getAvailableChineseVoices: () => [],
+  getAvailableVoices: () => [],
   getSelectedVoiceURI: () => null,
   setSelectedVoiceURI: vi.fn(),
   subscribeToVoicesChanged: () => () => {},
+  openVoiceInstallSettings: vi.fn(() => Promise.resolve()),
 }));
 
 function renderWithRouter() {
@@ -41,10 +39,7 @@ describe('ReviewPage', () => {
   });
 
   it('renders the first step (hieroglyph + Показать пиньинь) with a seeded card', async () => {
-    await addCards(
-      [{ word: '测试', pinyin: 'cè shì', context: '**测试** ok' }],
-      Date.now(),
-    );
+    await addCards([{ word: '测试', pinyin: 'cè shì', context: '**测试** ok' }], Date.now());
 
     renderWithRouter();
 
@@ -56,10 +51,7 @@ describe('ReviewPage', () => {
   });
 
   it('advances to step 2 and shows the pinyin', async () => {
-    await addCards(
-      [{ word: '测试', pinyin: 'cè shì', context: '**测试** ok' }],
-      Date.now(),
-    );
+    await addCards([{ word: '测试', pinyin: 'cè shì', context: '**测试** ok' }], Date.now());
 
     const user = userEvent.setup();
     renderWithRouter();
@@ -72,10 +64,7 @@ describe('ReviewPage', () => {
   });
 
   it('renders status badges including the count of new cards', async () => {
-    await addCards(
-      [{ word: '测试', pinyin: 'cè shì', context: '**测试** ok' }],
-      Date.now(),
-    );
+    await addCards([{ word: '测试', pinyin: 'cè shì', context: '**测试** ok' }], Date.now());
 
     renderWithRouter();
 
@@ -86,10 +75,7 @@ describe('ReviewPage', () => {
   });
 
   it('persists rating: clicking "Хорошо" through 3 steps updates the card and logs a review', async () => {
-    await addCards(
-      [{ word: '测试', pinyin: 'cè shì', context: '**测试** ok' }],
-      Date.now(),
-    );
+    await addCards([{ word: '测试', pinyin: 'cè shì', context: '**测试** ok' }], Date.now());
 
     const user = userEvent.setup();
     renderWithRouter();

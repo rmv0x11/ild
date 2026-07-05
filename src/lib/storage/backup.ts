@@ -10,6 +10,7 @@
 // the DOM download / native file-save glue lives in the UI / native layer.
 
 import type { Card, ReviewLog, SynonymCard, SynonymDeck } from '@/types/domain';
+import { normalizeLanguage } from '@/lib/lang/language';
 import { db } from './db';
 
 export const BACKUP_VERSION = 1;
@@ -103,7 +104,12 @@ export function parseBackup(text: string): BackupFile {
   } catch {
     throw new Error('Файл повреждён: не удалось разобрать JSON.');
   }
-  if (isObject(raw) && raw.app === 'ild' && raw.kind === 'backup' && raw.version !== BACKUP_VERSION) {
+  if (
+    isObject(raw) &&
+    raw.app === 'ild' &&
+    raw.kind === 'backup' &&
+    raw.version !== BACKUP_VERSION
+  ) {
     throw new Error(
       `Несовместимая версия резервной копии (${String(raw.version)}). Ожидалась версия ${BACKUP_VERSION}.`,
     );
@@ -125,37 +131,38 @@ export function parseBackup(text: string): BackupFile {
  *   the clean path for a true restore.
  */
 export async function restoreBackup(backup: BackupFile, mode: RestoreMode): Promise<RestoreResult> {
-  const { cards, reviews, synonymDecks, synonymCards } = backup.data;
+  const { reviews, synonymDecks, synonymCards } = backup.data;
+  // A pre-multi-language backup has cards without `lang`. The v4 DB migration
+  // only runs on a version bump — never on these bulk writes — so we must
+  // backfill here, otherwise restored cards are invisible to every
+  // language-scoped query (they'd appear as total data loss).
+  const cards = backup.data.cards.map((c) => ({
+    ...c,
+    lang: normalizeLanguage((c as { lang?: unknown }).lang),
+  }));
 
-  await db.transaction(
-    'rw',
-    db.cards,
-    db.reviews,
-    db.synonymDecks,
-    db.synonymCards,
-    async () => {
-      if (mode === 'replace') {
-        await Promise.all([
-          db.cards.clear(),
-          db.reviews.clear(),
-          db.synonymDecks.clear(),
-          db.synonymCards.clear(),
-        ]);
-        if (cards.length) await db.cards.bulkAdd(cards);
-        if (reviews.length) await db.reviews.bulkAdd(reviews);
-        if (synonymDecks.length) await db.synonymDecks.bulkAdd(synonymDecks);
-        if (synonymCards.length) await db.synonymCards.bulkAdd(synonymCards);
-      } else {
-        if (cards.length) await db.cards.bulkPut(cards);
-        if (synonymDecks.length) await db.synonymDecks.bulkPut(synonymDecks);
-        if (synonymCards.length) await db.synonymCards.bulkPut(synonymCards);
-        if (reviews.length) {
-          // Drop the original ids so the append-only log gets fresh keys.
-          await db.reviews.bulkAdd(reviews.map(({ id: _id, ...rest }) => rest));
-        }
+  await db.transaction('rw', db.cards, db.reviews, db.synonymDecks, db.synonymCards, async () => {
+    if (mode === 'replace') {
+      await Promise.all([
+        db.cards.clear(),
+        db.reviews.clear(),
+        db.synonymDecks.clear(),
+        db.synonymCards.clear(),
+      ]);
+      if (cards.length) await db.cards.bulkAdd(cards);
+      if (reviews.length) await db.reviews.bulkAdd(reviews);
+      if (synonymDecks.length) await db.synonymDecks.bulkAdd(synonymDecks);
+      if (synonymCards.length) await db.synonymCards.bulkAdd(synonymCards);
+    } else {
+      if (cards.length) await db.cards.bulkPut(cards);
+      if (synonymDecks.length) await db.synonymDecks.bulkPut(synonymDecks);
+      if (synonymCards.length) await db.synonymCards.bulkPut(synonymCards);
+      if (reviews.length) {
+        // Drop the original ids so the append-only log gets fresh keys.
+        await db.reviews.bulkAdd(reviews.map(({ id: _id, ...rest }) => rest));
       }
-    },
-  );
+    }
+  });
 
   return {
     cards: cards.length,

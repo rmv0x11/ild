@@ -76,12 +76,8 @@ describe('tts/native (facade on native platform)', () => {
     });
     const mod = await loadModule();
     mod.warmUpTts();
-    await vi.waitFor(() => expect(mod.getAvailableChineseVoices().length).toBe(3));
-    expect(mod.getAvailableChineseVoices().map((v) => v.name)).toEqual([
-      'Lili',
-      'Tingting',
-      'Cloud',
-    ]);
+    await vi.waitFor(() => expect(mod.getAvailableVoices('zh').length).toBe(3));
+    expect(mod.getAvailableVoices('zh').map((v) => v.name)).toEqual(['Lili', 'Tingting', 'Cloud']);
   });
 
   it('speaks with the selected voice index and its lang', async () => {
@@ -94,10 +90,10 @@ describe('tts/native (facade on native platform)', () => {
     });
     const mod = await loadModule();
     mod.warmUpTts();
-    await vi.waitFor(() => expect(mod.getAvailableChineseVoices().length).toBe(2));
-    mod.setSelectedVoiceURI('Lili');
+    await vi.waitFor(() => expect(mod.getAvailableVoices('zh').length).toBe(2));
+    mod.setSelectedVoiceURI('zh', 'Lili');
 
-    const res = await mod.speakChinese('你好');
+    const res = await mod.speak('你好', 'zh');
     expect(res.spoke).toBe(true);
     expect(speakMock).toHaveBeenCalledTimes(1);
     const opts = speakMock.mock.calls[0][0];
@@ -115,9 +111,9 @@ describe('tts/native (facade on native platform)', () => {
     });
     const mod = await loadModule();
     mod.warmUpTts();
-    await vi.waitFor(() => expect(mod.getAvailableChineseVoices().length).toBe(2));
+    await vi.waitFor(() => expect(mod.getAvailableVoices('zh').length).toBe(2));
 
-    await mod.speakChinese('你好');
+    await mod.speak('你好', 'zh');
     const opts = speakMock.mock.calls[0][0];
     expect(opts.voice).toBe(1); // prefers zh-CN Tingting over zh-TW
     expect(opts.lang).toBe('zh-CN');
@@ -128,8 +124,8 @@ describe('tts/native (facade on native platform)', () => {
     speakMock.mockRejectedValueOnce(new Error('boom'));
     const mod = await loadModule();
     mod.warmUpTts();
-    await vi.waitFor(() => expect(mod.getAvailableChineseVoices().length).toBe(1));
-    await expect(mod.speakChinese('x')).resolves.toMatchObject({ spoke: false });
+    await vi.waitFor(() => expect(mod.getAvailableVoices('zh').length).toBe(1));
+    await expect(mod.speak('x', 'zh')).resolves.toMatchObject({ spoke: false });
   });
 
   it('cancelSpeech stops the native engine', async () => {

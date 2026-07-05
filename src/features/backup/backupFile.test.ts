@@ -10,6 +10,7 @@ import { exportBackupFile, importBackupFile } from './backupFile';
 function card(id: string, word: string): Card {
   return {
     id,
+    lang: 'zh',
     word,
     pinyin: 'pīn',
     context: 'ctx',

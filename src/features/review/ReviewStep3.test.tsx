@@ -5,7 +5,7 @@ import { ReviewStep3 } from './ReviewStep3';
 describe('ReviewStep3', () => {
   const baseProps = {
     word: '你好',
-    pinyin: 'nǐ hǎo',
+    reading: 'nǐ hǎo',
     context: 'Привет, **你好**, как дела?',
     onRate: vi.fn(),
   };

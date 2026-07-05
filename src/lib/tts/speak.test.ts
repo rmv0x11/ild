@@ -111,6 +111,7 @@ describe('tts/speak', () => {
       /* noop */
     }
     lastUtterance = null;
+    window.localStorage.clear();
   });
 
   describe('isTtsAvailable', () => {
@@ -127,17 +128,22 @@ describe('tts/speak', () => {
     });
   });
 
-  describe('getChineseVoice', () => {
+  // The facade exposes voice selection as VoiceInfo (getVoiceInfo). The raw
+  // SpeechSynthesisVoice picker (formerly getChineseVoice) now lives in ./web as
+  // getVoice(lang); here we assert the picked voice through the public facade by
+  // matching on voiceURI (VoiceInfo is a fresh object, so identity checks don't
+  // apply). Default language is zh, so the zh cases mirror the old behavior.
+  describe('getVoiceInfo', () => {
     it('returns null when TTS is unavailable', async () => {
       installSpeechMocks({ unavailable: true });
       const mod = await loadModule();
-      expect(mod.getChineseVoice()).toBeNull();
+      expect(mod.getVoiceInfo('zh')).toBeNull();
     });
 
     it('returns null when getVoices returns an empty list', async () => {
       installSpeechMocks({ voices: [], speakBehavior: 'noop' });
       const mod = await loadModule();
-      expect(mod.getChineseVoice()).toBeNull();
+      expect(mod.getVoiceInfo('zh')).toBeNull();
     });
 
     it('returns the first zh-CN voice when present', async () => {
@@ -146,8 +152,7 @@ describe('tts/speak', () => {
       const zhCN2 = makeVoice('zh-CN', 'Mandarin 2');
       installSpeechMocks({ voices: [en, zhCN1, zhCN2], speakBehavior: 'noop' });
       const mod = await loadModule();
-      const voice = mod.getChineseVoice();
-      expect(voice).toBe(zhCN1);
+      expect(mod.getVoiceInfo('zh')?.voiceURI).toBe(zhCN1.voiceURI);
     });
 
     it('falls back to a generic zh- voice when no zh-CN is found', async () => {
@@ -156,8 +161,7 @@ describe('tts/speak', () => {
       const zhHK = makeVoice('zh-HK', 'Cantonese');
       installSpeechMocks({ voices: [en, zhTW, zhHK], speakBehavior: 'noop' });
       const mod = await loadModule();
-      const voice = mod.getChineseVoice();
-      expect(voice).toBe(zhTW);
+      expect(mod.getVoiceInfo('zh')?.voiceURI).toBe(zhTW.voiceURI);
     });
 
     it('returns null when there are voices but none are Chinese', async () => {
@@ -166,35 +170,42 @@ describe('tts/speak', () => {
         speakBehavior: 'noop',
       });
       const mod = await loadModule();
-      expect(mod.getChineseVoice()).toBeNull();
+      expect(mod.getVoiceInfo('zh')).toBeNull();
+    });
+
+    it('picks the voice matching the requested language', async () => {
+      const zhCN = makeVoice('zh-CN', 'Mandarin');
+      const koKR = makeVoice('ko-KR', 'Yuna');
+      installSpeechMocks({ voices: [zhCN, koKR], speakBehavior: 'noop' });
+      const mod = await loadModule();
+      expect(mod.getVoiceInfo('ko')?.voiceURI).toBe(koKR.voiceURI);
+      expect(mod.getVoiceInfo('zh')?.voiceURI).toBe(zhCN.voiceURI);
     });
 
     it('honors a persisted voiceURI selection when the voice is available', async () => {
       const zhCN1 = makeVoice('zh-CN', 'Tingting');
       const zhCN2 = makeVoice('zh-CN', 'Lili');
       installSpeechMocks({ voices: [zhCN1, zhCN2], speakBehavior: 'noop' });
-      window.localStorage.setItem('ild:tts:voiceURI', 'Lili');
+      window.localStorage.setItem('ild:tts:voiceURI:zh', 'Lili');
       const mod = await loadModule();
-      expect(mod.getChineseVoice()).toBe(zhCN2);
-      window.localStorage.clear();
+      expect(mod.getVoiceInfo('zh')?.voiceURI).toBe(zhCN2.voiceURI);
     });
 
     it('falls back to default selection when the persisted voiceURI is missing', async () => {
       const zhCN1 = makeVoice('zh-CN', 'Tingting');
       const zhCN2 = makeVoice('zh-CN', 'Lili');
       installSpeechMocks({ voices: [zhCN1, zhCN2], speakBehavior: 'noop' });
-      window.localStorage.setItem('ild:tts:voiceURI', 'Mei-Jia');
+      window.localStorage.setItem('ild:tts:voiceURI:zh', 'Mei-Jia');
       const mod = await loadModule();
-      expect(mod.getChineseVoice()).toBe(zhCN1);
-      window.localStorage.clear();
+      expect(mod.getVoiceInfo('zh')?.voiceURI).toBe(zhCN1.voiceURI);
     });
   });
 
-  describe('getAvailableChineseVoices', () => {
+  describe('getAvailableVoices', () => {
     it('returns an empty list when TTS is unavailable', async () => {
       installSpeechMocks({ unavailable: true });
       const mod = await loadModule();
-      expect(mod.getAvailableChineseVoices()).toEqual([]);
+      expect(mod.getAvailableVoices('zh')).toEqual([]);
     });
 
     it('returns only Chinese voices, sorted local-first then alphabetically', async () => {
@@ -207,7 +218,7 @@ describe('tts/speak', () => {
         speakBehavior: 'noop',
       });
       const mod = await loadModule();
-      const list = mod.getAvailableChineseVoices();
+      const list = mod.getAvailableVoices('zh');
       expect(list.map((v) => v.name)).toEqual(['Lili', 'Tingting', 'Cloud Mandarin']);
     });
   });
@@ -216,11 +227,20 @@ describe('tts/speak', () => {
     it('round-trips through localStorage', async () => {
       installSpeechMocks({ voices: [], speakBehavior: 'noop' });
       const mod = await loadModule();
-      expect(mod.getSelectedVoiceURI()).toBeNull();
-      mod.setSelectedVoiceURI('Tingting');
-      expect(mod.getSelectedVoiceURI()).toBe('Tingting');
-      mod.setSelectedVoiceURI(null);
-      expect(mod.getSelectedVoiceURI()).toBeNull();
+      expect(mod.getSelectedVoiceURI('zh')).toBeNull();
+      mod.setSelectedVoiceURI('zh', 'Tingting');
+      expect(mod.getSelectedVoiceURI('zh')).toBe('Tingting');
+      mod.setSelectedVoiceURI('zh', null);
+      expect(mod.getSelectedVoiceURI('zh')).toBeNull();
+    });
+
+    it('keeps selections separate per language', async () => {
+      installSpeechMocks({ voices: [], speakBehavior: 'noop' });
+      const mod = await loadModule();
+      mod.setSelectedVoiceURI('zh', 'Tingting');
+      mod.setSelectedVoiceURI('ko', 'Yuna');
+      expect(mod.getSelectedVoiceURI('zh')).toBe('Tingting');
+      expect(mod.getSelectedVoiceURI('ko')).toBe('Yuna');
     });
 
     it('notifies subscribers when the selection changes', async () => {
@@ -228,13 +248,12 @@ describe('tts/speak', () => {
       const mod = await loadModule();
       const listener = vi.fn();
       const unsubscribe = mod.subscribeToVoicesChanged(listener);
-      mod.setSelectedVoiceURI('Lili');
+      mod.setSelectedVoiceURI('zh', 'Lili');
       expect(listener).toHaveBeenCalled();
       unsubscribe();
       listener.mockClear();
-      mod.setSelectedVoiceURI('Tingting');
+      mod.setSelectedVoiceURI('zh', 'Tingting');
       expect(listener).not.toHaveBeenCalled();
-      window.localStorage.clear();
     });
   });
 
@@ -254,12 +273,12 @@ describe('tts/speak', () => {
     });
   });
 
-  describe('speakChinese', () => {
+  describe('speak', () => {
     it('resolves (via setTimeout fallback) when TTS is unavailable', async () => {
       installSpeechMocks({ unavailable: true });
       vi.useFakeTimers();
       const mod = await loadModule();
-      const p = mod.speakChinese('你好');
+      const p = mod.speak('你好', 'zh');
       // The fallback uses setTimeout(..., 800). Advance past it.
       await vi.advanceTimersByTimeAsync(800);
       await expect(p).resolves.toMatchObject({ spoke: false });
@@ -273,7 +292,7 @@ describe('tts/speak', () => {
       });
       const mod = await loadModule();
 
-      await expect(mod.speakChinese('你好')).resolves.toMatchObject({ spoke: true });
+      await expect(mod.speak('你好', 'zh')).resolves.toMatchObject({ spoke: true });
 
       // cancel() is called unconditionally to wake macOS Chrome's speech
       // engine — the wake-up call is part of "the path that works".
@@ -289,13 +308,24 @@ describe('tts/speak', () => {
       expect(lastUtterance!.voice).toBe(zhCN);
     });
 
+    it('uses the ko-KR locale and voice when speaking Korean', async () => {
+      const koKR = makeVoice('ko-KR', 'Yuna');
+      installSpeechMocks({ voices: [koKR], speakBehavior: 'endMicrotask' });
+      const mod = await loadModule();
+
+      await expect(mod.speak('안녕', 'ko')).resolves.toMatchObject({ spoke: true });
+      expect(lastUtterance!.text).toBe('안녕');
+      expect(lastUtterance!.lang).toBe('ko-KR');
+      expect(lastUtterance!.voice).toBe(koKR);
+    });
+
     it('resolves (does not reject) when utterance.onerror is fired', async () => {
       installSpeechMocks({ voices: [], speakBehavior: 'errorMicrotask' });
       const mod = await loadModule();
       // onerror used to reject; now we always resolve so the UI can recover
       // even when the browser drops the utterance silently. spoke=false +
       // errorType lets the UI explain what went wrong.
-      await expect(mod.speakChinese('hi')).resolves.toMatchObject({ spoke: false });
+      await expect(mod.speak('hi', 'zh')).resolves.toMatchObject({ spoke: false });
     });
 
     it('resolves (does not reject) when an exception is thrown synchronously while speaking', async () => {
@@ -304,13 +334,13 @@ describe('tts/speak', () => {
         throw new Error('speak failed');
       });
       const mod = await loadModule();
-      await expect(mod.speakChinese('boom')).resolves.toMatchObject({ spoke: false });
+      await expect(mod.speak('boom', 'zh')).resolves.toMatchObject({ spoke: false });
     });
 
     it('does not set a voice when no Chinese voice is available', async () => {
       installSpeechMocks({ voices: [makeVoice('en-US')], speakBehavior: 'endMicrotask' });
       const mod = await loadModule();
-      await expect(mod.speakChinese('hello')).resolves.toMatchObject({ spoke: true });
+      await expect(mod.speak('hello', 'zh')).resolves.toMatchObject({ spoke: true });
       expect(lastUtterance!.voice).toBeNull();
       expect(lastUtterance!.lang).toBe('zh-CN');
     });
