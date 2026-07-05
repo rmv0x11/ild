@@ -132,7 +132,7 @@ export const PRESETS: Preset[] = [
       'TOPIK I, уровень 1: приветствия, местоимения, числа, базовые глаголы и существительные.',
     category: 'topik',
     lang: 'ko',
-    approxCards: 55,
+    approxCards: 88,
     file: 'ko/topik-1.csv',
   },
   {
@@ -141,7 +141,7 @@ export const PRESETS: Preset[] = [
     description: 'TOPIK I, уровень 2: повседневная жизнь, покупки, время, погода, транспорт.',
     category: 'topik',
     lang: 'ko',
-    approxCards: 55,
+    approxCards: 73,
     file: 'ko/topik-2.csv',
   },
   {
@@ -150,7 +150,7 @@ export const PRESETS: Preset[] = [
     description: 'TOPIK II, уровень 3: работа, чувства, мнения, планы и связки предложений.',
     category: 'topik',
     lang: 'ko',
-    approxCards: 55,
+    approxCards: 95,
     file: 'ko/topik-3.csv',
   },
   {
@@ -159,7 +159,7 @@ export const PRESETS: Preset[] = [
     description: 'TOPIK II, уровень 4: общество, культура, хобби, здоровье, абстрактные понятия.',
     category: 'topik',
     lang: 'ko',
-    approxCards: 55,
+    approxCards: 91,
     file: 'ko/topik-4.csv',
   },
   {
@@ -168,7 +168,7 @@ export const PRESETS: Preset[] = [
     description: 'TOPIK II, уровень 5: новости, экономика, окружающая среда, формальная лексика.',
     category: 'topik',
     lang: 'ko',
-    approxCards: 50,
+    approxCards: 94,
     file: 'ko/topik-5.csv',
   },
   {
@@ -177,7 +177,7 @@ export const PRESETS: Preset[] = [
     description: 'TOPIK II, уровень 6: продвинутая, академическая и абстрактная лексика.',
     category: 'topik',
     lang: 'ko',
-    approxCards: 50,
+    approxCards: 100,
     file: 'ko/topik-6.csv',
   },
   {
@@ -186,7 +186,7 @@ export const PRESETS: Preset[] = [
     description: 'Сино-корейские и исконные числа, счётные слова, дни недели, части суток.',
     category: 'topic',
     lang: 'ko',
-    approxCards: 48,
+    approxCards: 78,
     file: 'ko/ko-numbers-time.csv',
   },
   {
@@ -195,7 +195,7 @@ export const PRESETS: Preset[] = [
     description: 'Блюда, рис и гарниры, напитки, ресторанные слова.',
     category: 'topic',
     lang: 'ko',
-    approxCards: 52,
+    approxCards: 79,
     file: 'ko/ko-food.csv',
   },
   {
@@ -204,7 +204,7 @@ export const PRESETS: Preset[] = [
     description: 'Родственники, обращения, друзья и коллеги.',
     category: 'topic',
     lang: 'ko',
-    approxCards: 46,
+    approxCards: 76,
     file: 'ko/ko-family.csv',
   },
   {
@@ -213,7 +213,7 @@ export const PRESETS: Preset[] = [
     description: 'Транспорт, билеты, гостиница, направления и ориентирование.',
     category: 'topic',
     lang: 'ko',
-    approxCards: 46,
+    approxCards: 74,
     file: 'ko/ko-travel.csv',
   },
   {
@@ -222,7 +222,7 @@ export const PRESETS: Preset[] = [
     description: 'Части тела, симптомы, врач и аптека, здоровье.',
     category: 'topic',
     lang: 'ko',
-    approxCards: 46,
+    approxCards: 78,
     file: 'ko/ko-body-health.csv',
   },
 ];
