@@ -42,7 +42,7 @@ jobs:
           # Actions → Variables); update it + re-run this workflow after any
           # tunnel-URL change. The literal below is only a fallback and must be
           # kept in sync with the live tunnel.
-          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://databases-nested-collaborative-twin.trycloudflare.com' }}
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://edited-tomatoes-confident-respect.trycloudflare.com' }}
           VITE_GOOGLE_ENABLED: ${{ vars.VITE_GOOGLE_ENABLED || 'false' }}
         run: npm run build
 

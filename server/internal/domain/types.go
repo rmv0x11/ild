@@ -34,6 +34,9 @@ type Card struct {
 	ID           string    `json:"id"`
 	UserID       string    `json:"-"`
 	Word         string    `json:"word"`
+	// Lang is the study language ('zh' | 'ko'). Cards synced from a client that
+	// predates multi-language arrive empty and are stored as 'zh'.
+	Lang         string    `json:"lang"`
 	Pinyin       string    `json:"pinyin"`
 	Context      string    `json:"context"`
 	Stage        CardStage `json:"stage"`

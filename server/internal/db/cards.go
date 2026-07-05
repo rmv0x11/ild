@@ -83,18 +83,24 @@ func upsertCardTx(ctx context.Context, tx *sql.Tx, c *domain.Card) (bool, error)
 		return false, nil
 	}
 
+	// Default the language for cards from a client that predates multi-language
+	// so they never land with an empty lang.
+	if c.Lang == "" {
+		c.Lang = "zh"
+	}
+
 	// INSERT OR REPLACE is fine because the PK is (id, user_id) and we don't
 	// have child rows with FK to cards. (Reviews reference card_id by string,
 	// without an FK constraint.)
 	_, err = tx.ExecContext(ctx, `
 		INSERT OR REPLACE INTO cards (
-			id, user_id, word, pinyin, context,
+			id, user_id, word, pinyin, context, lang,
 			stage, learning_step, interval_days, ease,
 			due_at, reps, lapses,
 			created_at, updated_at, deleted_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
-		c.ID, c.UserID, c.Word, c.Pinyin, c.Context,
+		c.ID, c.UserID, c.Word, c.Pinyin, c.Context, c.Lang,
 		string(c.Stage), c.LearningStep, c.IntervalDays, c.Ease,
 		c.DueAt, c.Reps, c.Lapses,
 		c.CreatedAt, c.UpdatedAt, c.DeletedAt,
@@ -115,7 +121,7 @@ func (d *DB) ListCardsSince(ctx context.Context, userID string, sinceMs int64, l
 		return nil, errors.New("user_id required")
 	}
 	query := `
-		SELECT id, user_id, word, pinyin, context,
+		SELECT id, user_id, word, pinyin, context, lang,
 		       stage, learning_step, interval_days, ease,
 		       due_at, reps, lapses,
 		       created_at, updated_at, deleted_at
@@ -142,7 +148,7 @@ func (d *DB) ListCardsSince(ctx context.Context, userID string, sinceMs int64, l
 			deleted sql.NullInt64
 		)
 		if err := rows.Scan(
-			&c.ID, &c.UserID, &c.Word, &c.Pinyin, &c.Context,
+			&c.ID, &c.UserID, &c.Word, &c.Pinyin, &c.Context, &c.Lang,
 			&stage, &c.LearningStep, &c.IntervalDays, &c.Ease,
 			&c.DueAt, &c.Reps, &c.Lapses,
 			&c.CreatedAt, &c.UpdatedAt, &deleted,

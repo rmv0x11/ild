@@ -474,6 +474,38 @@ func TestUpsertCard_LastWriteWins(t *testing.T) {
 	}
 }
 
+func TestUpsertCard_PersistsLangAndDefaultsToZh(t *testing.T) {
+	d := newTestDB(t)
+	u := newUser(t, d, "lang@l.l")
+
+	ko := makeCard(u.ID, "ko-1", 1000)
+	ko.Lang = "ko"
+	if err := d.UpsertCard(context.Background(), &ko); err != nil {
+		t.Fatalf("upsert ko: %v", err)
+	}
+	// A card from a client that predates multi-language arrives with empty lang.
+	legacy := makeCard(u.ID, "legacy-1", 1000)
+	legacy.Lang = ""
+	if err := d.UpsertCard(context.Background(), &legacy); err != nil {
+		t.Fatalf("upsert legacy: %v", err)
+	}
+
+	got, err := d.ListCardsSince(context.Background(), u.ID, 0, 0)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	byID := map[string]domain.Card{}
+	for _, c := range got {
+		byID[c.ID] = c
+	}
+	if byID["ko-1"].Lang != "ko" {
+		t.Fatalf("expected lang=ko, got %q", byID["ko-1"].Lang)
+	}
+	if byID["legacy-1"].Lang != "zh" {
+		t.Fatalf("expected empty lang to default to zh, got %q", byID["legacy-1"].Lang)
+	}
+}
+
 func TestBulkUpsertCards_AndListCardsSince(t *testing.T) {
 	d := newTestDB(t)
 	u := newUser(t, d, "bulk@b.b")
